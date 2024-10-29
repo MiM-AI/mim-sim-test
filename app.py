@@ -5,7 +5,8 @@ import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 import re
 import gzip
-
+import torch  # for matrix optimization
+from typing import List, Tuple  # for type hints
 
 # external_institution = "Portland State University"
 # years = "2023-2024"
@@ -14,107 +15,188 @@ import gzip
 
 # test = find_most_similar_courses(institution, years, course_code, target_df, top_n=10)
 
-def find_most_similar_courses(institution, years, course_code, target_df, top_n=10):
-    """
-    Finds the top N most similar courses based on cosine similarity.
+with open("embeddings/custom_embeddings_model/best_matrix.pkl", "rb") as f:
+    best_matrix_loaded = pickle.load(f)
 
-    Parameters:
-    - selected_embedding: array-like, the embedding of the course to compare
-    - target_df: DataFrame, contains course information and their embeddings
-    - top_n: int, the number of top similar courses to return
 
-    Returns:
-    - DataFrame of top N similar courses with their similarity scores
+def apply_matrix_to_embeddings_dataframe(matrix: torch.tensor, df: pd.DataFrame):
+    for column in ["text_1_embedding", "text_2_embedding"]:
+        df[f"{column}_custom"] = df[column].apply(
+            lambda x: embedding_multiplied_by_matrix(x, matrix)
+        )
+    df["cosine_similarity_custom"] = df.apply(
+        lambda row: cosine_similarity(
+            row["text_1_embedding_custom"], row["text_2_embedding_custom"]
+        ),
+        axis=1,
+    )
+
+def embedding_multiplied_by_matrix(
+    embedding: List[float], matrix: torch.tensor
+) -> np.array:
+    embedding_tensor = torch.tensor(embedding).float()
+    modified_embedding = embedding_tensor @ matrix
+    modified_embedding = modified_embedding.detach().numpy()
+    return modified_embedding
+
+
+# def find_most_similar_courses(institution, years, course_code, target_df, top_n=10):
+#     """
+#     Finds the top N most similar courses based on cosine similarity.
+
+#     Parameters:
+#     - selected_embedding: array-like, the embedding of the course to compare
+#     - target_df: DataFrame, contains course information and their embeddings
+#     - top_n: int, the number of top similar courses to return
+
+#     Returns:
+#     - DataFrame of top N similar courses with their similarity scores
+#     """
+#     # Load the pickle file
+#     if external_institution == "Portland Community College":
+#         institution = "PCC"
+#     elif external_institution == "Portland State University":
+#         institution = "PSU"
+#     elif external_institution == "Amherst College":
+#         institution = "AC"
+#     try:
+#         # with open(f"embeddings/{institution}/{years}.pkl", 'rb') as f:
+#         #     selected_embedding = pickle.load(f)
+#         with gzip.open(f"embeddings/{institution}/{years}.pkl.gz", "rb") as f:
+#             selected_embedding = pickle.load(f)
+
+#     except FileNotFoundError:
+#         st.error("The embedding file for this institution and year could not be found.")
+#         return None
+
+#     # Check if the course code ends with a letter
+#     if re.search(r'\d+[A-Z]$', course_code):
+#         # Remove the letter at the end of the course code
+#         course_code = course_code[:-1]
+
+#     course_code = course_code.upper()
+
+#     selected_embedding['COURSE CODE'] = selected_embedding['COURSE CODE'].str.upper()
+#     selected_embedding = selected_embedding.dropna(subset=['COURSE CODE']).reset_index(drop=True)
+#     selected_embedding = selected_embedding[selected_embedding['COURSE CODE'] != 'N/A']
+
+#     selected_embedding = selected_embedding[selected_embedding['COURSE CODE'].str.contains(course_code)].reset_index(drop=True)
+#     # Extract specific course info for external_course_info
+#     external_course_info = selected_embedding[['COURSE CODE', 'COURSE TITLE', 'DESCRIPTION']]
+    
+#     print(external_course_info)
+#     # test['COURSE CODE'].unique()
+
+#     # selected_embedding[selected_embedding['COURSE CODE'].str.contains("ENG")]
+#     # selected_embedding[selected_embedding['COURSE CODE'].str.contains("ENG")]['COURSE CODE'].unique()
+#     # selected_embedding[selected_embedding['COURSE CODE'].str.contains(course_code)].reset_index(drop=True)
+
+#     # 4453 ANTH 340U Design, Politics and Society  Anthropological approaches to design aesthetic...
+
+#     # selected_embedding = selected_embedding[selected_embedding['COURSE CODE'] == course_code].reset_index(drop=True)
+#     # selected_embedding = selected_embedding[selected_embedding['COURSE TITLE'] == course_title]
+    
+#     if len(selected_embedding) == 0:
+#         print(f"{course_code} not found")
+#         return None
+
+#     selected_embedding = selected_embedding.loc[0, 'embedding']
+
+#     # Reshape the selected course embedding for computation
+#     selected_embedding = np.array(selected_embedding).reshape(1, -1)
+    
+#     # Stack the embeddings from the target DataFrame
+#     target_embeddings = np.vstack(target_df['embedding'])
+    
+#     # Calculate cosine similarities
+#     similarities = cosine_similarity(selected_embedding, target_embeddings).flatten()
+    
+#     # Get the indices of the top N most similar courses
+#     top_indices = np.argsort(similarities)[-top_n:][::-1]
+    
+#     # Retrieve the top N similar courses and add the similarity score
+#     similar_courses = target_df.iloc[top_indices].copy()
+#     similar_courses['similarity_score'] = similarities[top_indices]
+    
+#     return external_course_info, similar_courses
+
+
+
+# def find_most_similar_courses(institution, years, course_code, target_df, top_n=10):
+#     """
+#     Finds the top N most similar courses based on cosine similarity.
+#     """
+
+#     if external_institution == "Portland Community College":
+#         institution = "PCC"
+#     elif external_institution == "Portland State University":
+#         institution = "PSU"
+#     elif external_institution == "Amherst College":
+#         institution = "AC"
+
+#     try:
+#         with gzip.open(f"embeddings/{institution}/{years}.pkl.gz", "rb") as f:
+#             selected_embedding = pickle.load(f)
+
+#     except FileNotFoundError:
+#         st.error("The embedding file for this institution and year could not be found.")
+#         return None
+
+#     # Process course code
+#     if re.search(r'\d+[A-Z]$', course_code):
+#         course_code = course_code[:-1]
+#     course_code = course_code.upper()
+
+#     # Filter and clean selected embedding
+#     selected_embedding['COURSE CODE'] = selected_embedding['COURSE CODE'].str.upper()
+#     selected_embedding = selected_embedding.dropna(subset=['COURSE CODE']).reset_index(drop=True)
+#     selected_embedding = selected_embedding[selected_embedding['COURSE CODE'] != 'N/A']
+#     selected_embedding = selected_embedding[selected_embedding['COURSE CODE'].str.contains(course_code)].reset_index(drop=True)
+    
+#     # Return None if no matching course is found
+#     if len(selected_embedding) == 0:
+#         print(f"{course_code} not found")
+#         return None, None
+    
+#     # Extract specific course info for external_course_info
+#     external_course_info = selected_embedding[['COURSE CODE', 'COURSE TITLE', 'DESCRIPTION']]
+    
+#     # Extract embedding for similarity check
+#     selected_embedding = selected_embedding.loc[0, 'embedding']
+#     selected_embedding = np.array(selected_embedding).reshape(1, -1)
+
+#     # Prepare target embeddings and calculate similarities
+#     target_embeddings = np.vstack(target_df['embedding'])
+#     similarities = cosine_similarity(selected_embedding, target_embeddings).flatten()
+    
+#     # Select the top N indices based on similarity
+#     top_indices = np.argsort(similarities)[-top_n:][::-1]
+#     similar_courses = target_df.iloc[top_indices].copy()
+#     similar_courses['similarity_score'] = similarities[top_indices]
+
+#     return external_course_info, similar_courses
+
+
+def find_most_similar_courses(institution, years, course_code, target_df, matrix, top_n=10):
     """
-    # Load the pickle file
-    if external_institution == "Portland Community College":
+    Finds the top N most similar courses based on cosine similarity, using custom embeddings if available.
+    """
+
+    # Handle specific institution naming
+    if institution == "Portland Community College":
         institution = "PCC"
-    elif external_institution == "Portland State University":
+    elif institution == "Portland State University":
         institution = "PSU"
-    elif external_institution == "Amherst College":
+    elif institution == "Amherst College":
         institution = "AC"
+
     try:
-        # with open(f"embeddings/{institution}/{years}.pkl", 'rb') as f:
-        #     selected_embedding = pickle.load(f)
         with gzip.open(f"embeddings/{institution}/{years}.pkl.gz", "rb") as f:
             selected_embedding = pickle.load(f)
 
     except FileNotFoundError:
-        st.error("The embedding file for this institution and year could not be found.")
-        return None
-
-    # Check if the course code ends with a letter
-    if re.search(r'\d+[A-Z]$', course_code):
-        # Remove the letter at the end of the course code
-        course_code = course_code[:-1]
-
-    course_code = course_code.upper()
-
-    selected_embedding['COURSE CODE'] = selected_embedding['COURSE CODE'].str.upper()
-    selected_embedding = selected_embedding.dropna(subset=['COURSE CODE']).reset_index(drop=True)
-    selected_embedding = selected_embedding[selected_embedding['COURSE CODE'] != 'N/A']
-
-    selected_embedding = selected_embedding[selected_embedding['COURSE CODE'].str.contains(course_code)].reset_index(drop=True)
-    # Extract specific course info for external_course_info
-    external_course_info = selected_embedding[['COURSE CODE', 'COURSE TITLE', 'DESCRIPTION']]
-    
-    print(external_course_info)
-    # test['COURSE CODE'].unique()
-
-    # selected_embedding[selected_embedding['COURSE CODE'].str.contains("ENG")]
-    # selected_embedding[selected_embedding['COURSE CODE'].str.contains("ENG")]['COURSE CODE'].unique()
-    # selected_embedding[selected_embedding['COURSE CODE'].str.contains(course_code)].reset_index(drop=True)
-
-    # 4453 ANTH 340U Design, Politics and Society  Anthropological approaches to design aesthetic...
-
-    # selected_embedding = selected_embedding[selected_embedding['COURSE CODE'] == course_code].reset_index(drop=True)
-    # selected_embedding = selected_embedding[selected_embedding['COURSE TITLE'] == course_title]
-    
-    if len(selected_embedding) == 0:
-        print(f"{course_code} not found")
-        return None
-
-    selected_embedding = selected_embedding.loc[0, 'embedding']
-
-    # Reshape the selected course embedding for computation
-    selected_embedding = np.array(selected_embedding).reshape(1, -1)
-    
-    # Stack the embeddings from the target DataFrame
-    target_embeddings = np.vstack(target_df['embedding'])
-    
-    # Calculate cosine similarities
-    similarities = cosine_similarity(selected_embedding, target_embeddings).flatten()
-    
-    # Get the indices of the top N most similar courses
-    top_indices = np.argsort(similarities)[-top_n:][::-1]
-    
-    # Retrieve the top N similar courses and add the similarity score
-    similar_courses = target_df.iloc[top_indices].copy()
-    similar_courses['similarity_score'] = similarities[top_indices]
-    
-    return external_course_info, similar_courses
-
-
-
-def find_most_similar_courses(institution, years, course_code, target_df, top_n=10):
-    """
-    Finds the top N most similar courses based on cosine similarity.
-    """
-
-    if external_institution == "Portland Community College":
-        institution = "PCC"
-    elif external_institution == "Portland State University":
-        institution = "PSU"
-    elif external_institution == "Amherst College":
-        institution = "AC"
-
-    try:
-        with gzip.open(f"embeddings/{institution}/{years}.pkl.gz", "rb") as f:
-            selected_embedding = pickle.load(f)
-
-    except FileNotFoundError:
-        st.error("The embedding file for this institution and year could not be found.")
-        return None
+        print("The embedding file for this institution and year could not be found.")
+        return None, None
 
     # Process course code
     if re.search(r'\d+[A-Z]$', course_code):
@@ -135,22 +217,20 @@ def find_most_similar_courses(institution, years, course_code, target_df, top_n=
     # Extract specific course info for external_course_info
     external_course_info = selected_embedding[['COURSE CODE', 'COURSE TITLE', 'DESCRIPTION']]
     
-    # Extract embedding for similarity check
+    # Extract and adjust embedding with custom matrix for similarity check
     selected_embedding = selected_embedding.loc[0, 'embedding']
-    selected_embedding = np.array(selected_embedding).reshape(1, -1)
+    selected_embedding_custom = embedding_multiplied_by_matrix(np.array(selected_embedding), matrix).reshape(1, -1)
 
-    # Prepare target embeddings and calculate similarities
-    target_embeddings = np.vstack(target_df['embedding'])
-    similarities = cosine_similarity(selected_embedding, target_embeddings).flatten()
+    # Prepare target embeddings, apply matrix, and calculate similarities
+    target_embeddings_custom = np.vstack(target_df['embedding'].apply(lambda x: embedding_multiplied_by_matrix(x, matrix)))
+    similarities_custom = cosine_similarity(selected_embedding_custom, target_embeddings_custom).flatten()
     
     # Select the top N indices based on similarity
-    top_indices = np.argsort(similarities)[-top_n:][::-1]
+    top_indices = np.argsort(similarities_custom)[-top_n:][::-1]
     similar_courses = target_df.iloc[top_indices].copy()
-    similar_courses['similarity_score'] = similarities[top_indices]
+    similar_courses['similarity_score_custom'] = similarities_custom[top_indices]
 
     return external_course_info, similar_courses
-
-
 
 
 def load_courses(institution, years):
@@ -218,7 +298,7 @@ if st.button("Find Similar Courses"):
         # print(course_code)
         # print(external_institution)
 
-        external_course_info, similar_courses = find_most_similar_courses(external_institution, years, course_code, internal_emb)
+        external_course_info, similar_courses = find_most_similar_courses(external_institution, years, course_code, internal_emb, best_matrix_loaded)
         print("EXTERNAL COURSE INFO")
         print(external_course_info)
         print("SIMILAR COURSES")
@@ -228,25 +308,22 @@ if st.button("Find Similar Courses"):
             st.write(f"{external_course_info['COURSE CODE'].iat[0]} - {external_course_info['COURSE TITLE'].iat[0]}")
             st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
             st.write("---")  # Separator for readability
-            st.write("\n")  # Separator for readability
 
             st.write("### Top OSU Similar Courses:")
             # Loop through each row in the DataFrame and format the output
             for idx, row in similar_courses.iterrows():
-                # print(row)
-                # print(row['code'])
-                similarity_score = f"{row['similarity_score'] * 100:.2f}%"
-                print(similarity_score)
-                
-                # st.write(f"**Similar {idx + 1} - Similarity Index: {similarity_score}**")
-                st.write(f"{row['code']} - {row['title']} (Similarity Index: {similarity_score})")
-                st.write(f"**Description**: {row['description']}")
-                st.write("---")  # Separator for readability
-            
+                similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
+                if similarity_score is not None:
+                    similarity_score = f"{similarity_score * 100:.2f}%"
+                    st.write(f"{row['code']} - {row['title']} (Similarity Index: {similarity_score})")
+                    st.write(f"**Description**: {row['description']}")
+                    st.write("---")  # Separator for readability
+                else:
+                    st.write(f"{row['code']} - {row['title']}")
+                    st.write(f"**Description**: {row['description']}")
+                    st.write("---")  # Separator for readability
         else:
             st.write("No similar courses found.")
-    else:
-        st.warning("Please select a course code to search.")
 
 
 

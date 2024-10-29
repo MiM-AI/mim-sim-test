@@ -1,0 +1,6 @@
+*.csv
+.*
+
+# Do not ignore .gitignore and .env.example
+!.gitignore
+!.env.example
