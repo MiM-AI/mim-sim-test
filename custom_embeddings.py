@@ -406,6 +406,9 @@ def optimize_matrix(
 
 
 
+# -------------------------------------------------
+# Start of code to process custom emb
+
 # split data into train and test sets
 test_fraction = 0.2  
 random_seed = 123  
