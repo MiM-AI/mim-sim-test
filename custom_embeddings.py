@@ -47,7 +47,6 @@ s3 = session.client('s3')
 
 bucket_name = "mim-course-catalogs-jsons"
 
-
 def list_files_in_bucket(bucket_name, prefix=''):
     files = []
     result = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
@@ -63,12 +62,10 @@ def list_files_in_bucket(bucket_name, prefix=''):
             break
     return files
 
-
 def load_json_from_s3(bucket_name, key):
     obj = s3.get_object(Bucket=bucket_name, Key=key)
     data = json.load(BytesIO(obj['Body'].read()))
     return data
-
 
 def load_inst_data():
 	files = list_files_in_bucket(bucket_name)
@@ -88,7 +85,6 @@ def load_inst_data():
 
 	retdat = pd.concat(all_data)
 	return retdat
-
 
 external_institution = "Portland Community College (PCC)"
 def get_articulation_dat(external_institution):
@@ -127,7 +123,6 @@ def get_articulation_dat(external_institution):
     pdat = pdat.drop_duplicates(subset=['YEAR', 'EXT COURSE CODE'])
 
     return pdat
-
 
 def load_osu():
 	odat = pd.read_excel('data/CIM approved snapshot 2024-07-15.xlsx')
@@ -171,7 +166,6 @@ rename_dict = {'Central Oregon Com College': 'Central-Oregon-Community-College',
 dat = [get_articulation_dat(x) for x in college_list]
 dat = pd.concat(dat)
 dat['TRNS_DESCRIPTION'] = dat['TRNS_DESCRIPTION'].map(rename_dict).fillna(dat['TRNS_DESCRIPTION'])
-
 
 mdat = dat.merge(idat, left_on=['TRNS_DESCRIPTION', 'YEAR', 'EXT COURSE CODE'], right_on=['INSTITUTION', 'YEAR', 'COURSE CODE'], how='left')
 mdat = mdat.merge(odat, on=['INT COURSE CODE'], how='left')
