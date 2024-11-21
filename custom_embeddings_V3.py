@@ -1,33 +1,28 @@
-# imports
 import os
-import boto3
 import json
-import pandas as pd
+import pickle
+import random 
+import ast
+from typing import List, Tuple  
+
 import numpy as np
+import pandas as pd
 from io import BytesIO
 from dotenv import load_dotenv
-import pickle
-
-# For embeddings and model fine-tuning
+from sklearn.model_selection import train_test_split  
+from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
+import boto3
 import torch
 from torch.utils.data import DataLoader
 from sentence_transformers import SentenceTransformer, InputExample, losses, util
 from datasets import Dataset
-
-from sklearn.model_selection import train_test_split  # for splitting train & test data
 from langchain.embeddings import OpenAIEmbeddings
 from openai import OpenAI
-from typing import List, Tuple  # for type hints
-import random  # for generating run IDs
 from numpy import dot
 from numpy.linalg import norm
-import ast
-import torch
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-from typing import Tuple
-from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
+from rake_nltk import Rake
+
+
 
 # Load environment variables
 load_dotenv()
@@ -35,7 +30,21 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI()
 
-embeddings_model = OpenAIEmbeddings(model="text-embedding-ada-002")
+# embeddings_model = OpenAIEmbeddings(model="text-embedding-ada-002")
+embeddings_model = OpenAIEmbeddings(model="text-embedding-3-large")
+
+KEYWORDS = True
+
+def compute_embeddings(df, text_column, col_name='embedding', batch_size=16):
+    embeddings = []
+    for i in range(0, len(df), batch_size):
+        # Extract a batch of texts
+        batch_texts = df[text_column].iloc[i:i + batch_size].tolist()
+        # Get embeddings for the batch
+        batch_embeddings = embeddings_model.embed_documents(batch_texts)
+        embeddings.extend(batch_embeddings)
+    df[col_name] = [torch.tensor(embed) if embed is not None else None for embed in embeddings]
+    return df
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Add this line to suppress the warning
@@ -45,6 +54,23 @@ session = boto3.Session(profile_name='personal')
 s3 = session.client('s3')
 
 bucket_name = "mim-course-catalogs-jsons"
+
+rake = Rake()
+
+# Extract keywords from the DESCRIPTION column
+def extract_keywords(description):
+    rake.extract_keywords_from_text(description)
+    return " ".join(rake.get_ranked_phrases())
+
+
+def get_embedding(text):
+    return torch.tensor(embeddings_model.embed_query(text))
+
+
+def compute_embeddings(df, text_column, col_name='embedding'):
+    df[col_name] = df[text_column].apply(lambda x: get_embedding(x) if isinstance(x, str) and x else None)
+    return df
+
 
 def list_files_in_bucket(bucket_name, prefix=''):
     files = []
@@ -147,6 +173,96 @@ def load_osu():
     return odat
 
 
+# Generate negative examples by finding the most similar non-matching courses
+def generate_negative_examples(neg_emb, match_emb):
+    negative_examples = []
+
+    # Filter match_emb for non-NaN embeddings and reset index
+    filtered_match = match_emb[match_emb['embedding'].notna()].reset_index(drop=True)
+    match_embeddings = torch.stack(filtered_match['embedding'].tolist())
+    match_texts = filtered_match['CODE TITLE DESC 2'].tolist()
+
+    print("Finding the most similar courses from neg_emb in match_emb...")
+    for idx, row in neg_emb.iterrows():
+        course_desc_1 = row['CODE TITLE DESC 1']
+        embedding1 = row['embedding']
+
+        # Skip if the embedding is None
+        if embedding1 is None:
+            print(f"Skipping '{course_desc_1}' due to missing embedding.")
+            continue
+
+        # Compute cosine similarities
+        cosine_scores = util.cos_sim(embedding1.unsqueeze(0), match_embeddings)
+        
+        # Get the highest cosine similarity score and its index
+        max_score, top_index = torch.max(cosine_scores, dim=1)
+        top_index = top_index.item()
+        max_score = max_score.item()
+        
+        # Retrieve the most similar course description
+        most_similar_desc_2 = match_texts[top_index]
+
+        # Debugging output
+        print(f"Course: '{course_desc_1}'")
+        print(f"Most similar course: '{most_similar_desc_2}' with cosine similarity score: {max_score:.4f}\n")
+
+        # Add to negative examples
+        negative_examples.append([course_desc_1, most_similar_desc_2, -1])
+
+    neg_df = pd.DataFrame(negative_examples, columns=['CODE TITLE DESC 1', 'CODE TITLE DESC 2', 'label'])
+    return neg_df
+
+
+# Utility function for cosine similarity
+def cosine_similarity(embedding1, embedding2):
+    return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
+
+# Calculate accuracy and standard error
+# def accuracy_and_se(cosine_similarities: List[float], labels: List[int]) -> Tuple[float, float]:
+#     accuracies = []
+#     for threshold in np.linspace(0, 1, 2001):  # Generates thresholds from 0 to 1
+#         correct = sum(
+#             1 for cs, label in zip(cosine_similarities, labels) if (cs > threshold and label == 1) or (cs <= threshold and label == 0)
+#         )
+#         accuracy = correct / len(cosine_similarities)
+#         accuracies.append(accuracy)
+    
+#     max_accuracy = max(accuracies)
+#     n = len(cosine_similarities)
+#     se = (max_accuracy * (1 - max_accuracy) / n) ** 0.5  # Standard error of a binomial distribution
+#     return max_accuracy, se
+
+
+def accuracy_and_se(cosine_similarities: List[float], labels: List[int], threshold: float = 0.5) -> Tuple[float, float]:
+    correct = sum(
+        1 for cs, label in zip(cosine_similarities, labels) if (cs > threshold and label == 1) or (cs <= threshold and label == 0)
+    )
+    accuracy = correct / len(cosine_similarities)
+    n = len(cosine_similarities)
+    se = (accuracy * (1 - accuracy) / n) ** 0.5  # Standard error of a binomial distribution
+    return accuracy, se
+
+# Function to apply transformation matrix to an embedding
+def apply_matrix(embedding: List[float], matrix: torch.Tensor) -> np.ndarray:
+    embedding_tensor = torch.tensor(embedding, dtype=torch.float32)
+    transformed_embedding = embedding_tensor @ matrix
+    return transformed_embedding.detach().numpy()
+
+# Apply matrix transformation to all embeddings in a DataFrame
+def apply_matrix_to_embeddings_dataframe(matrix: torch.Tensor, df: pd.DataFrame):
+    for col in ["text_1_embedding", "text_2_embedding"]:
+        df[f"{col}_custom"] = df[col].apply(lambda x: apply_matrix(x, matrix))
+    
+    df["cosine_similarity_custom"] = df.apply(
+        lambda row: cosine_similarity(row["text_1_embedding_custom"], row["text_2_embedding_custom"]),
+        axis=1
+    )
+
+
+
+
+
 
 # Get OSU data
 odat = load_osu()
@@ -189,9 +305,24 @@ dat['TRNS_DESCRIPTION'] = dat['TRNS_DESCRIPTION'].map(rename_dict).fillna(dat['T
 mdat = dat.merge(idat, left_on=['TRNS_DESCRIPTION', 'YEAR', 'EXT COURSE CODE'], right_on=['INSTITUTION', 'YEAR', 'COURSE CODE'], how='left')
 mdat = mdat.dropna(subset=['INSTITUTION'])
 
+
+
+
+
+if KEYWORDS == True:
+    mdat["DESCRIPTION"] = mdat["DESCRIPTION"].apply(extract_keywords)
+    odat['INT DESCRIPTION'] = odat['INT DESCRIPTION'].dropna().apply(extract_keywords)
+
+
+
 # Setup COURSE CODE, COURSE TITLE, COURSE DESCRIPTION
-mdat['CODE TITLE DESC 1'] = mdat['COURSE CODE'] + " " + mdat['COURSE TITLE'] + " - " + mdat['DESCRIPTION']
-odat['CODE TITLE DESC 2'] = odat['INT COURSE CODE'] + " " + odat['INT COURSE TITLE'] + " - " + odat['INT DESCRIPTION']
+mdat['CODE TITLE DESC 1'] = mdat['COURSE CODE'] + ", " + mdat['COURSE TITLE'] + ", " + mdat['DESCRIPTION']
+mdat['CODE TITLE DESC 1'] = mdat['CODE TITLE DESC 1'].str.lower()
+mdat = mdat.dropna(subset=['CODE TITLE DESC 1'])
+
+odat['CODE TITLE DESC 2'] = odat['INT COURSE CODE'] + ", " + odat['INT COURSE TITLE'] + ", " + odat['INT DESCRIPTION']
+odat['CODE TITLE DESC 2'] = odat['CODE TITLE DESC 2'].str.lower()
+odat = odat.dropna(subset=['CODE TITLE DESC 2'])
 
 # Merge osu data from current year then filter nans
 mdat = mdat.merge(odat, on=['INT COURSE CODE'], how='left')
@@ -218,12 +349,13 @@ ndat['TRNS_DESCRIPTION'] = ndat['TRNS_DESCRIPTION'].map(rename_dict).fillna(ndat
 nmdat = ndat.merge(idat, left_on=['TRNS_DESCRIPTION', 'YEAR', 'EXT COURSE CODE'], right_on=['INSTITUTION', 'YEAR', 'COURSE CODE'], how='left')
 nmdat = nmdat.dropna(subset=['INSTITUTION'])
 
-nmdat['CODE TITLE DESC 1'] = nmdat['COURSE CODE'] + " " + nmdat['COURSE TITLE'] + " - " + nmdat['DESCRIPTION']
 
 
+if KEYWORDS == True:
+    nmdat["DESCRIPTION"] = nmdat["DESCRIPTION"].apply(extract_keywords)
 
-
-
+nmdat['CODE TITLE DESC 1'] = nmdat['COURSE CODE'] + ", " + nmdat['COURSE TITLE'] + ", " + nmdat['DESCRIPTION']
+nmdat['CODE TITLE DESC 1'] = nmdat['CODE TITLE DESC 1'].str.lower()
 
 
 
@@ -231,25 +363,6 @@ nmdat['CODE TITLE DESC 1'] = nmdat['COURSE CODE'] + " " + nmdat['COURSE TITLE'] 
 neg_dat = nmdat
 match_dat = odat
 
-def get_ada_embedding(text):
-    return torch.tensor(embeddings_model.embed_query(text))
-
-
-def compute_embeddings(df, text_column, col_name='embedding'):
-    df[col_name] = df[text_column].apply(lambda x: get_ada_embedding(x) if isinstance(x, str) and x else None)
-    return df
-
-
-def convert_to_tensor(x):
-    if isinstance(x, str):
-        try:
-            # Use ast.literal_eval to safely parse the string to a list
-            embedding_list = ast.literal_eval(x)
-            return torch.tensor(embedding_list, dtype=torch.float32)
-        except (ValueError, SyntaxError) as e:
-            print(f"Error converting string to tensor: {e}")
-            return None  # Handle this case as needed (e.g., drop or replace with a default tensor)
-    return x  # Return as-is if it's already a tensor or not a string
 
 
 
@@ -257,54 +370,19 @@ def convert_to_tensor(x):
 neg_emb = compute_embeddings(neg_dat, 'CODE TITLE DESC 1')
 match_emb = compute_embeddings(match_dat, 'CODE TITLE DESC 2')
 
-neg_emb.to_pickle("neg_emb_test.pkl")
-match_emb.to_pickle("match_emb_test.pkl")
+# neg_emb.to_pickle("embeddings/neg_emb_large.pkl")
+# match_emb.to_pickle("embeddings/match_emb_large.pkl")
+
+neg_emb.to_pickle("embeddings/neg_emb_large_keywords.pkl")
+match_emb.to_pickle("embeddings/match_emb_large_keywords.pkl")
 
 # Load the DataFrame with tensors using pickle
-neg_emb = pd.read_pickle("neg_emb_test.pkl")
-match_emb = pd.read_pickle("match_emb_test.pkl")
+# neg_emb = pd.read_pickle("embeddings/neg_emb_large.pkl")
+# match_emb = pd.read_pickle("embeddings/match_emb_large.pkl")
 
 
 
-# Generate negative examples by finding the most similar non-matching courses
-def generate_negative_examples(neg_emb, match_emb):
-    negative_examples = []
 
-    # Filter match_emb for non-NaN embeddings and reset index
-    filtered_match = match_emb[match_emb['embedding'].notna()].reset_index(drop=True)
-    match_embeddings = torch.stack(filtered_match['embedding'].tolist())
-    match_texts = filtered_match['CODE TITLE DESC 2'].tolist()
-
-    print("Finding the most similar courses from neg_emb in match_emb...")
-    for idx, row in neg_emb.iterrows():
-        course_desc_1 = row['CODE TITLE DESC 1']
-        embedding1 = row['embedding']
-
-        # Skip if the embedding is None
-        if embedding1 is None:
-            print(f"Skipping '{course_desc_1}' due to missing embedding.")
-            continue
-
-        # Compute cosine similarities
-        cosine_scores = util.cos_sim(embedding1.unsqueeze(0), match_embeddings)
-        
-        # Get the highest cosine similarity score and its index
-        max_score, top_index = torch.max(cosine_scores, dim=1)
-        top_index = top_index.item()
-        max_score = max_score.item()
-        
-        # Retrieve the most similar course description
-        most_similar_desc_2 = match_texts[top_index]
-
-        # Debugging output
-        print(f"Course: '{course_desc_1}'")
-        print(f"Most similar course: '{most_similar_desc_2}' with cosine similarity score: {max_score:.4f}\n")
-
-        # Add to negative examples
-        negative_examples.append([course_desc_1, most_similar_desc_2, -1])
-
-    neg_df = pd.DataFrame(negative_examples, columns=['CODE TITLE DESC 1', 'CODE TITLE DESC 2', 'label'])
-    return neg_df
 
 
 
@@ -313,7 +391,7 @@ neg_df = generate_negative_examples(neg_emb, match_emb)
 neg_df.columns = ['text_1', 'text_2', 'label']
 
 # Combine positive and negative examples
-df = pd.concat([df, neg_df]).reset_index(drop=True)
+mdat = pd.concat([df, neg_df]).reset_index(drop=True)
 
 
 
@@ -323,67 +401,31 @@ df = pd.concat([df, neg_df]).reset_index(drop=True)
 
 
 
-import torch
-import numpy as np
-import pandas as pd
-from typing import List, Tuple
 
-# Utility function for cosine similarity
-def cosine_similarity(embedding1, embedding2):
-    return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
 
-# Calculate accuracy and standard error
-def accuracy_and_se(cosine_similarities: List[float], labels: List[int]) -> Tuple[float, float]:
-    accuracies = []
-    for threshold in np.linspace(-1, 1, 2001):  # Generates thresholds from -1 to 1
-        correct = sum(
-            1 for cs, label in zip(cosine_similarities, labels) if (cs > threshold and label == 1) or (cs <= threshold and label == -1)
-        )
-        accuracy = correct / len(cosine_similarities)
-        accuracies.append(accuracy)
-    
-    max_accuracy = max(accuracies)
-    n = len(cosine_similarities)
-    se = (max_accuracy * (1 - max_accuracy) / n) ** 0.5  # Standard error of a binomial distribution
-    return max_accuracy, se
 
-# Function to apply transformation matrix to an embedding
-def apply_matrix(embedding: List[float], matrix: torch.Tensor) -> np.ndarray:
-    embedding_tensor = torch.tensor(embedding, dtype=torch.float32)
-    transformed_embedding = embedding_tensor @ matrix
-    return transformed_embedding.detach().numpy()
-
-# Apply matrix transformation to all embeddings in a DataFrame
-def apply_matrix_to_embeddings_dataframe(matrix: torch.Tensor, df: pd.DataFrame):
-    for col in ["text_1_embedding", "text_2_embedding"]:
-        df[f"{col}_custom"] = df[col].apply(lambda x: apply_matrix(x, matrix))
-    
-    df["cosine_similarity_custom"] = df.apply(
-        lambda row: cosine_similarity(row["text_1_embedding_custom"], row["text_2_embedding_custom"]),
-        axis=1
-    )
 
 
 
 
 # Define or import the accuracy_and_se function
-def accuracy_and_se(predictions: np.ndarray, labels: np.ndarray, threshold: float = 0.5) -> Tuple[float, float]:
-    """
-    Calculate accuracy and standard error based on predicted probabilities and binary labels.
+# def accuracy_and_se(predictions: np.ndarray, labels: np.ndarray, threshold: float = 0.5) -> Tuple[float, float]:
+#     """
+#     Calculate accuracy and standard error based on predicted probabilities and binary labels.
 
-    Args:
-        predictions (np.ndarray): Array of predicted probabilities.
-        labels (np.ndarray): Array of binary labels (0 or 1).
-        threshold (float): Threshold to convert probabilities to binary predictions.
+#     Args:
+#         predictions (np.ndarray): Array of predicted probabilities.
+#         labels (np.ndarray): Array of binary labels (0 or 1).
+#         threshold (float): Threshold to convert probabilities to binary predictions.
 
-    Returns:
-        Tuple[float, float]: Accuracy and standard error.
-    """
-    predictions_binary = (predictions >= threshold).astype(int)
-    correct = (predictions_binary == labels).sum()
-    accuracy = correct / len(labels)
-    se = np.sqrt((accuracy * (1 - accuracy)) / len(labels))
-    return accuracy, se
+#     Returns:
+#         Tuple[float, float]: Accuracy and standard error.
+#     """
+#     predictions_binary = (predictions >= threshold).astype(int)
+#     correct = (predictions_binary == labels).sum()
+#     accuracy = correct / len(labels)
+#     se = np.sqrt((accuracy * (1 - accuracy)) / len(labels))
+#     return accuracy, se
 
 def optimize_matrix(
     modified_embedding_length: int,
@@ -391,6 +433,7 @@ def optimize_matrix(
     max_epochs: int,
     learning_rate: float,
     dropout_fraction: float,
+    acc_threshold: float,
     df: pd.DataFrame,
     print_progress: bool = True
 ) -> torch.Tensor:  # Return type updated to return the matrix
@@ -400,12 +443,18 @@ def optimize_matrix(
         labels = torch.tensor(df_subset[label_col].values, dtype=torch.float32)
         return e1, e2, labels
 
+    df = df.copy()
+
     test_fraction = 0.2  
     validation_fraction = 0.1  # Fraction of training data for validation
     random_seed = 123  
 
+    if -1 in df['label'].unique():
+        df['label'] = df['label'].apply(lambda x: 0 if x == -1 else 1)
+
+
     # Convert labels from -1 and 1 to 0 and 1
-    df['label'] = df['label'].apply(lambda x: 0 if x == -1 else 1)
+    # df['label'] = df['label'].apply(lambda x: 0 if x == -1 else 1)
 
     # Split the data into training and testing sets
     train_val_df, test_df = train_test_split(
@@ -537,7 +586,7 @@ def optimize_matrix(
                 labels = subset["label"].values
 
                 # Calculate metrics
-                accuracy, se = accuracy_and_se(similarities, labels)
+                accuracy, se = accuracy_and_se(similarities, labels, acc_threshold)
                 try:
                     auc = roc_auc_score(labels, similarities)
                 except ValueError:
@@ -598,14 +647,12 @@ def add_embeddings_to_dataframe(df):
 
 # Assuming `get_ada_embedding` is a function you have defined elsewhere that returns the embedding for a given text
 # Now, use this function to add embeddings to your DataFrame
-df2 = add_embeddings_to_dataframe(df)
+moddat = add_embeddings_to_dataframe(mdat)
 
-# Convert labels: -1 -> 0, 1 remains 1
-df['label'] = df['label'].apply(lambda x: 0 if x == -1 else 1)
+moddat.to_pickle("embeddings/model_df_emb_keywords.pkl")
 
-
-# Check if the embeddings have been added correctly
-print(df2.head())
+# Load the DataFrame with tensors using pickle
+moddat = pd.read_pickle("embeddings/model_df_emb_keywords.pkl")
 
 # Proceed to use the `optimize_matrix` and `process_dataframe` functions after embeddings are added
 optimized_matrix = optimize_matrix(
@@ -614,16 +661,13 @@ optimized_matrix = optimize_matrix(
     max_epochs=50,
     learning_rate=0.0001,
     dropout_fraction=0.1,
-    df=df2,
+    acc_threshold=0.7,
+    df=moddat,
     print_progress=True
 )
 
-df = df[['text_1', 'text_2', 'label', 'text_1_embedding', 'text_2_embedding',
-       'text_1_embedding_custom', 'text_2_embedding_custom']]
 
-processed_df = process_dataframe(optimized_matrix, df2)
-
-with open("embeddings/custom_embeddings_model/best_matrix.pkl", "wb") as f:
+with open("embeddings/custom_embeddings_model/best_matrix_keywords.pkl", "wb") as f:
     pickle.dump(optimized_matrix, f)
 
 
