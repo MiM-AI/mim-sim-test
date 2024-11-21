@@ -218,8 +218,11 @@ if __name__ == "__main__":
             # print(external_institution)
 
             external_course_info, similar_courses = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords)
-            print("EXTERNAL COURSE INFO")
-            print(external_course_info)
+            print("--------------------------------")
+            print("EXTERNAL COURSE INFO:")
+            # print(external_course_info)
+            print(external_course_info['COURSE CODE'].iat[0], external_course_info['COURSE TITLE'].iat[0])
+            print("--------------------------------")
             print("SIMILAR COURSES")
             print(similar_courses)
             if similar_courses is not None:
