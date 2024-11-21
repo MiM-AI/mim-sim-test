@@ -400,33 +400,6 @@ mdat = pd.concat([df, neg_df]).reset_index(drop=True)
 
 
 
-
-
-
-
-
-
-
-
-# Define or import the accuracy_and_se function
-# def accuracy_and_se(predictions: np.ndarray, labels: np.ndarray, threshold: float = 0.5) -> Tuple[float, float]:
-#     """
-#     Calculate accuracy and standard error based on predicted probabilities and binary labels.
-
-#     Args:
-#         predictions (np.ndarray): Array of predicted probabilities.
-#         labels (np.ndarray): Array of binary labels (0 or 1).
-#         threshold (float): Threshold to convert probabilities to binary predictions.
-
-#     Returns:
-#         Tuple[float, float]: Accuracy and standard error.
-#     """
-#     predictions_binary = (predictions >= threshold).astype(int)
-#     correct = (predictions_binary == labels).sum()
-#     accuracy = correct / len(labels)
-#     se = np.sqrt((accuracy * (1 - accuracy)) / len(labels))
-#     return accuracy, se
-
 def optimize_matrix(
     modified_embedding_length: int,
     batch_size: int,
@@ -620,9 +593,6 @@ def optimize_matrix(
 
 
 
-
-# Assume 'df' is your DataFrame containing 'text_1_embedding' and 'text_2_embedding' columns
-# and 'matrix' is the optimized matrix obtained from the 'optimize_matrix' function.
 
 # Function to process the DataFrame and apply matrix transformations
 def process_dataframe(matrix: torch.Tensor, df: pd.DataFrame):
