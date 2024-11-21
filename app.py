@@ -193,8 +193,8 @@ if __name__ == "__main__":
     else:
         course_code = None
 
-    apply_matrix = st.checkbox("Apply Custom Embeddings", value=True)
-    keywords = st.checkbox("Keyword Embeddings", value=True)
+    apply_matrix = st.checkbox("Apply Custom Embeddings", value=False)
+    keywords = st.checkbox("Keyword Embeddings", value=False)
 
 
     # if keywords == True:
@@ -210,9 +210,6 @@ if __name__ == "__main__":
 
     #     with gzip.open(f"embeddings/OSU/osu_course_embeddings.pkl.gz", "rb") as f:
     #         internal_emb = pickle.load(f)
-
-
-
 
     # Button to perform similarity check
     if st.button("Find Similar Courses"):
@@ -237,7 +234,8 @@ if __name__ == "__main__":
                     similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
                     if similarity_score is not None:
                         similarity_score = f"{similarity_score * 100:.2f}%"
-                        st.write(f"{row['code']} - {row['title']} (Similarity Index: {similarity_score})")
+                        # st.write(f"{row['code']} - {row['title']} (Similarity Index: {similarity_score})")
+                        st.write(f"{row['code']} - {row['title']}")
                         st.write(f"**Description**: {row['description']}")
                         st.write("---")  # Separator for readability
                     else:
