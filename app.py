@@ -8,9 +8,9 @@ import gzip
 import torch  # for matrix optimization
 from typing import List, Tuple  # for type hints
 
-# institution = "Portland Community College"
-# years = "2019-2020"
-# course_code = "Soc 204"
+external_institution = "Portland Community College"
+years = "2019-2020"
+course_code = "Soc 204"
 # target_df = internal_emb
 # matrix = best_matrix_loaded
 
@@ -84,7 +84,6 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
             with gzip.open(f"embeddings/OSU/osu_course_embeddings.pkl.gz", "rb") as f:
                 target_df = pickle.load(f)
 
-
     except FileNotFoundError:
         print("The embedding file for this institution and year could not be found.")
         return None, None
@@ -133,7 +132,6 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
     return external_course_info, similar_courses
 
 
-
 def load_courses(institution, years, keywords):
     try:
         # Load the embedding data for the selected institution and year
@@ -161,8 +159,6 @@ def load_courses(institution, years, keywords):
     except FileNotFoundError:
         st.warning(f"Data for {institution} in {years} not found.")
         return {}
-
-
 
 
 if __name__ == "__main__":
@@ -195,29 +191,30 @@ if __name__ == "__main__":
 
     apply_matrix = st.checkbox("Apply Custom Embeddings", value=False)
     keywords = st.checkbox("Keyword Embeddings", value=False)
-
-
-    # if keywords == True:
-    #     with open("embeddings/custom_embeddings_model/best_matrix_keywords.pkl", "rb") as f:
-    #         best_matrix_loaded = pickle.load(f)
-
-    #     with gzip.open(f"embeddings/OSU/osu_course_embeddings_keywords.pkl.gz", "rb") as f:
-    #         internal_emb = pickle.load(f)
-
-    # else: 
-    #     with open("embeddings/custom_embeddings_model/best_matrix.pkl", "rb") as f:
-    #         best_matrix_loaded = pickle.load(f)
-
-    #     with gzip.open(f"embeddings/OSU/osu_course_embeddings.pkl.gz", "rb") as f:
-    #         internal_emb = pickle.load(f)
+    multimodel = st.checkbox("Multi-model (Baseline + Keyword)", value=False)
 
     # Button to perform similarity check
     if st.button("Find Similar Courses"):
         if course_code:
             # print(course_code)
             # print(external_institution)
+            if multimodel == True:
+                external_course_info, similar_courses1 = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=True)
+                external_course_info, similar_courses2 = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=False)
 
-            external_course_info, similar_courses = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords)
+                # Merge the two dataframes on 'code'
+                merged_df = pd.merge(similar_courses1, similar_courses2, on='code', suffixes=('_1', '_2'))
+
+                # Compute weighted average of similarity scores
+                merged_df['weighted_similarity'] = (merged_df['similarity_score_1'] + merged_df['similarity_score_2']) / 2
+
+                # Sort the dataframe by weighted similarity score in descending order
+                similar_courses = merged_df[['code', 'title_1', 'description_1', 'CODE TITLE DESC_1', 'weighted_similarity']].sort_values(by='weighted_similarity', ascending=False)
+                similar_courses.columns = ['code', 'title', 'description', 'CODE TITLE DESC', 'similarity']
+
+            else:
+                external_course_info, similar_courses = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords)
+            
             print("--------------------------------")
             print("EXTERNAL COURSE INFO:")
             # print(external_course_info)
