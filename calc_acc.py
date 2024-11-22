@@ -10,17 +10,41 @@ institutions_dict = {"Portland Community College (PCC)": "PCC",
 				"Portland State University": "PSU", 
 				"Amherst College": "AC"}
 
-def get_upper_lower_dat(institutions_dict):
+institutions_dict = {"Portland Community College (PCC)": "PCC",
+				"Portland State University": "PSU", 
+				"Amherst College": "AC"}
 
-	institutions = [x for x in institutions_dict]
+institutions = {"Central-Oregon-Community-College",
+"Chemeketa-Community-College",
+"Clackamas-Community-College",
+"Lane-Community-College",
+"Linn-Benton-Community-College",
+"Mt-Hood-Community-College",
+"Oregon-Institute-of-Technology",
+"Portland-Community-College",
+"Portland-State-University",
+"Western-Oregon-University"}
+
+
+def get_upper_lower_dat(institutions):
+
+	# institutions = [x for x in institutions_dict]
 
 	# Load upper/lower division transfer
 	udat = pd.read_excel("data/Lower_to_Upper_Transfer.xlsx")
 
+	udat['Institution'] = udat['Institution'].str.replace(" ", "-")
+	udat['Institution'] = udat['Institution'].str.replace(" (PCC)", "")
+	
 	udat = udat[udat['Institution'].isin(institutions)]
-	udat = udat[udat['Transfer Term'] >= 202000]
 
-	udat['Institution'] = udat['Institution'].replace(institutions_dict)
+	udat[udat['Institution'].str.contains("Oregon")]
+
+	# [x for x in institutions if x not in udat['Institution'].unique()]
+
+	# udat = udat[udat['Transfer Term'] >= 202000]
+
+	# udat['Institution'] = udat['Institution'].replace(institutions_dict)
 
 	start = np.floor(udat['Transfer Term']/100).astype(int) - 1 
 	end = np.floor(udat['Transfer Term']/100).astype(int) 
@@ -36,7 +60,13 @@ def get_upper_lower_dat(institutions_dict):
 
 
 def get_articulation_dat(external_institution):
-	adat = pd.read_csv('data/Articulation_data.csv', encoding="ISO-8859-1")
+	print(f"Processing: {external_institution}")
+	external_institution = external_institution.replace("-", " ")
+	
+	adat = pd.read_csv('data/Articulation_data.csv', encoding="ISO-8859-1", low_memory=False)
+	adat['TRNS_DESCRIPTION'] = adat['TRNS_DESCRIPTION'].str.replace(" (PCC)", "")
+
+
 	pdat = adat[adat['TRNS_DESCRIPTION'] == external_institution]
 
 	pdat = pdat[['EQUIV_EXISTS', 'TRNS_DESCRIPTION', 'TR_SUBJ', 'TR_COURSE', 'TR_TITLE', 'TERM', 'EQUIV_SUBJECT', 'EQUIV_CRSE', 'EQUI_TITLE']]
@@ -61,15 +91,21 @@ def get_articulation_dat(external_institution):
 	return pdat
 
 
-def get_art_tables(institutions_dict):
-	institutions = [x for x in institutions_dict]
+def get_art_tables(institutions):
+	institutions = [x.replace("-", " ") for x in institutions]
 
-	adat = [get_articulation_dat(x) for x in institutions_dict]
+	adat = [get_articulation_dat(x) for x in institutions]
 	mdat = pd.concat(adat)
 
-	mdat['TRNS_DESCRIPTION'] = mdat['TRNS_DESCRIPTION'].replace(institutions_dict)
+	[x for x in institutions if x not in mdat['TRNS_DESCRIPTION'].unique()]
 
-	mdat = mdat[mdat['YEAR'].astype(int) >= 2020]
+	# adat[adat['TRNS_DESCRIPTION'].str.contains("Oregon")]
+
+	# len(mdat['TRNS_DESCRIPTION'].unique())
+
+	# mdat['TRNS_DESCRIPTION'] = mdat['TRNS_DESCRIPTION'].replace(institutions_dict)
+
+	# mdat = mdat[mdat['YEAR'].astype(int) >= 2020]
 
 	start = mdat['YEAR'].astype(int) - 1 
 	end =  mdat['YEAR'].astype(int) 
@@ -88,8 +124,8 @@ def proc_acc(udat, apply_matrix=False, keywords=False, multimodel=False):
 	# Iterate through udat and update with match information
 	matches = []
 
-	# row = udat.iloc[9, :]
-	# row
+	row = udat.iloc[9, :]
+	row
 	for idx, row in udat.iterrows():
 		print(idx)
         if multimodel == True:
@@ -111,7 +147,7 @@ def proc_acc(udat, apply_matrix=False, keywords=False, multimodel=False):
 		else:
 			# Find most similar courses
 			_, similar_courses = find_most_similar_courses(row['Ext_Inst'], row['Transfer_Year'], row['Ext_Course_Code'], 
-									apply_matrix=apply_matrix, keywords=keywords)
+									top_n=20, apply_matrix=apply_matrix, keywords=keywords)
 		
 		if isinstance(similar_courses, pd.DataFrame):
 
@@ -169,96 +205,17 @@ def proc_acc(udat, apply_matrix=False, keywords=False, multimodel=False):
 	return outdat
 
 
-
-#    Ext_Inst Transfer_Year Ext_Course_Code Int_Course_Code  ... row_number match  similar_courses_row_number  similarity_score
-# 0       PCC     2021-2022         ART 115         ART 115  ...        1.0     1                       357.0          0.825784
-# 3       PCC     2019-2020         ATH 101        ANTH 240  ...        1.0     1                       282.0          0.724298
-# 4       PCC     2021-2022          BA 211          BA 211  ...        1.0     1                       566.0          0.778920
-# 5       PCC     2019-2020          ES 101          ES 101  ...        1.0     1                      1835.0          0.910654
-# 6       PCC     2019-2020           G 201         GEO 201  ...        1.0     1                      2264.0          0.732905
-# 7       PCC     2019-2020           G 202         GEO 202  ...        1.0     1                      2266.0          0.718301
-# 8       PCC     2019-2020           G 203         GEO 203  ...        1.0     1                      2267.0          0.739299
-# 9       PCC     2020-2021         GEO 266        GEOG 362  ...        NaN     0                         NaN               NaN
-# 10      PCC     2022-2023         GEO 266        GEOG 460  ...        5.0     1                      2370.0          0.693428
-# 11      PCC     2021-2022         HST 102         HST 102  ...        1.0     1                      2664.0          0.819601
-# 12      PCC     2022-2023         HST 121         HST 104  ...        1.0     1                      2666.0          0.812507
-# 13      PCC     2021-2022         MTH 111         MTH 111  ...        1.0     1                      3056.0          0.816988
-# 14      PCC     2021-2022         MTH 112         MTH 112  ...        1.0     1                      3057.0          0.838751
-# 16      PCC     2020-2021         MUS 105         MUS 101  ...        1.0     1                      3216.0          0.791413
-# 17      PCC     2020-2021         PHY 101          PH 106  ...        NaN     0                         NaN               NaN
-# 18      PCC     2020-2021         PHY 122          PH 206  ...        NaN     0                         NaN               NaN
-# 19      PCC     2020-2021         PHY 123          PH 207  ...        NaN     0                         NaN               NaN
-# 22      PCC     2021-2022         SOC 204         SOC 204  ...        1.0     1                      4128.0          0.878372
-# 23      PCC     2020-2021          WR 121          WR 121  ...        1.0     1                      4504.0          0.778778
-# 24      PSU     2019-2020          BA 325          BA 370  ...        1.0     1                       601.0          0.666456
-# 25      PSU     2020-2021          BI 427          BI 454  ...        NaN     0                         NaN               NaN
-# 26      PSU     2022-2023          CS 314          CS 361  ...        NaN     0                         NaN               NaN
-# 27      PSU     2019-2020         DES 121          GD 226  ...        1.0     1                      2234.0          0.652121
-# 28      PSU     2019-2020         DES 210         ART 121  ...        4.0     1                       359.0          0.625320
-# 29      PSU     2019-2020         DES 290          GD 269  ...        1.0     1                      2237.0          0.699179
-# 30      PSU     2020-2021        GEOG 230        GEOG 103  ...        2.0     1                      2332.0          0.769460
-# 31      PSU     2019-2020         MTH 255         MTH 255  ...        2.0     1                      3070.0          0.776020
-# 32      PSU     2020-2021         PSY 204         PSY 202  ...        1.0     1                      3875.0          0.756955
-
-
-#    Ext_Inst Transfer_Year Ext_Course_Code Int_Course_Code Ext_Course_Code OSU_Course_Code  row_number  match  similar_courses_row_number  similarity_score
-# 0       PCC     2021-2022         ART 115         ART 115         ART 115         ART 115         1.0      1                       512.0          0.826470
-# 1       PCC     2021-2022        ART 140A         ART 263        ART 140A            None         NaN     -1                         NaN               NaN
-# 2       PCC     2020-2021         ART 273         ART 271         ART 273            None         NaN     -1                         NaN               NaN
-# 3       PCC     2019-2020         ATH 101        ANTH 240         ATH 101        ANTH 240         1.0      1                       382.0          0.724287
-# 4       PCC     2021-2022          BA 211          BA 211          BA 211          BA 211         1.0      1                       770.0          0.778878
-# 5       PCC     2019-2020          ES 101          ES 101          ES 101          ES 101         1.0      1                      2523.0          0.910678
-# 6       PCC     2019-2020           G 201         GEO 201           G 201         GEO 201         1.0      1                      3099.0          0.732851
-# 7       PCC     2019-2020           G 202         GEO 202           G 202         GEO 202         1.0      1                      3101.0          0.718366
-# 8       PCC     2019-2020           G 203         GEO 203           G 203         GEO 203         1.0      1                      3103.0          0.739311
-# 9       PCC     2020-2021         GEO 266        GEOG 362         GEO 266        GEOG 362         5.0      1                      3208.0          0.693846
-# 10      PCC     2022-2023         GEO 266        GEOG 460         GEO 266        GEOG 460         6.0      1                      3229.0          0.693444
-# 11      PCC     2021-2022         HST 102         HST 102         HST 102         HST 102         1.0      1                      3633.0          0.819753
-# 12      PCC     2022-2023         HST 121         HST 104         HST 121         HST 104         1.0      1                      3635.0          0.812520
-# 13      PCC     2021-2022         MTH 111         MTH 111         MTH 111         MTH 111         1.0      1                      4310.0          0.816988
-# 14      PCC     2021-2022         MTH 112         MTH 112         MTH 112         MTH 112         1.0      1                      4312.0          0.838664
-# 15      PCC     2021-2022         MTH 255         MTH 255         MTH 255            None         NaN     -1                         NaN               NaN
-# 16      PCC     2020-2021         MUS 105         MUS 101         MUS 105         MUS 101         1.0      1                      4494.0          0.791413
-# 17      PCC     2020-2021         PHY 101          PH 106         PHY 101          PH 106         5.0      1                      5108.0          0.675720
-# 18      PCC     2020-2021         PHY 122          PH 206         PHY 122            None         NaN      0                         NaN               NaN
-# 19      PCC     2020-2021         PHY 123          PH 207         PHY 123            None         NaN      0                         NaN               NaN
-# 20      PCC     2020-2021        PSY 201A         PSY 201        PSY 201A            None         NaN     -1                         NaN               NaN
-# 21      PCC     2020-2021        PSY 202A         PSY 202        PSY 202A            None         NaN     -1                         NaN               NaN
-# 22      PCC     2021-2022         SOC 204         SOC 204         SOC 204         SOC 204         1.0      1                      5799.0          0.878414
-# 23      PCC     2020-2021          WR 121          WR 121          WR 121          WR 121         1.0      1                      6324.0          0.804296
-# 24      PSU     2019-2020          BA 325          BA 370          BA 325          BA 370         1.0      1                       828.0          0.666495
-# 25      PSU     2020-2021          BI 427          BI 454          BI 427          BI 454         1.0      1                      1134.0          0.774808
-# 26      PSU     2022-2023          CS 314          CS 361          CS 314            None         NaN      0                         NaN               NaN
-# 27      PSU     2019-2020         DES 121          GD 226         DES 121          GD 226         2.0      1                      3068.0          0.652217
-# 28      PSU     2019-2020         DES 210         ART 121         DES 210         ART 121         4.0      1                       514.0          0.625234
-# 29      PSU     2019-2020         DES 290          GD 269         DES 290          GD 269         1.0      1                      3071.0          0.699090
-# 30      PSU     2020-2021        GEOG 230        GEOG 103        GEOG 230        GEOG 103         2.0      1                      3183.0          0.769489
-# 31      PSU     2019-2020         MTH 255         MTH 255         MTH 255         MTH 255         2.0      1                      4325.0          0.776020
-# 32      PSU     2020-2021         PSY 204         PSY 202         PSY 204         PSY 202         1.0      1                      5405.0          0.756944
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-udat1 = get_upper_lower_dat(institutions_dict)
-udat2 = get_art_tables(institutions_dict)
+udat1 = get_upper_lower_dat(institutions)
+udat2 = get_art_tables(institutions)
 udat = pd.concat([udat1, udat2]).reset_index(drop=True)
+udat['Ext_Inst'] = udat['Ext_Inst'].str.replace(" ", "-")
+
+test = pdat[pdat['TRNS_DESCRIPTION'].str.contains("Lane Comm")]
+test[test['EXT COURSE CODE'].str.contains("BI 231")]
+
+outdat = proc_acc(udat, False, False, False)
 
 
-
-
-
-proc_acc(udat, False, False)
 proc_acc(udat, True, False)
 proc_acc(udat, True, True)
 

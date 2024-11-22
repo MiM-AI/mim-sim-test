@@ -189,9 +189,12 @@ if __name__ == "__main__":
     else:
         course_code = None
 
-    apply_matrix = st.checkbox("Apply Custom Embeddings", value=False)
-    keywords = st.checkbox("Keyword Embeddings", value=False)
-    multimodel = st.checkbox("Multi-model (Baseline + Keyword)", value=False)
+    # apply_matrix = st.checkbox("Apply Custom Embeddings", value=False)
+    # keywords = st.checkbox("Keyword Embeddings", value=False)
+    # multimodel = st.checkbox("Multi-model (Baseline + Keyword)", value=False)
+    multimodel = False
+    keywords = False
+    apply_matrix = False
 
     # Button to perform similarity check
     if st.button("Find Similar Courses"):
