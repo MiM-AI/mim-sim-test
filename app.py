@@ -7,10 +7,11 @@ import re
 import gzip
 import torch  # for matrix optimization
 from typing import List, Tuple  # for type hints
+import glob
 
-external_institution = "Portland Community College"
-years = "2019-2020"
-course_code = "Soc 204"
+# external_institution = "Portland Community College"
+# years = "2019-2020"
+# course_code = "Soc 204"
 # target_df = internal_emb
 # matrix = best_matrix_loaded
 
@@ -142,7 +143,7 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
     return external_course_info, similar_courses
 
 
-def load_courses(institution, years, keywords):
+def load_courses(institution, years, keywords=False):
     try:
         # Load the embedding data for the selected institution and year
         # with open(f"embeddings/{institution}/{years}.pkl", 'rb') as f:
@@ -176,17 +177,36 @@ if __name__ == "__main__":
     st.title("Course Similarity Checker")
 
     # User inputs
-    external_institution = st.selectbox("Select Institution", ["Portland Community College"])
+    institution = st.selectbox("Select Institution", ["Portland-Community-College", 
+        "Central-Oregon-Community-College", 
+        "Linn-Benton-Community-College"])
+    
+    institution = institution.replace(" ", "-")
+    list_years = glob.glob(f"embeddings/{institution}/*")
+    
+    # [x.split("/")[-1].split("_")[0].replace(".pkl.gz", "").set() for x in list_years]
 
-    years = st.selectbox("Select Year", ["2019-2020", "2020-2021", "2021-2022", "2022-2023", "2023-2024"])
+    list_years_processed = [
+        x.split("/")[-1].split("_")[0].replace(".pkl.gz", "") 
+        for x in list_years
+    ]
+
+    # Get unique values
+    unique_years = list(set(list_years_processed))
+
+    # Sort by the starting year
+    sorted_years = sorted(unique_years, key=lambda x: int(x.split("-")[0]))
+    
+    years = st.selectbox("Select Year", sorted_years)
+    # years = st.selectbox("Select Year", ["2019-2020", "2020-2021", "2021-2022", "2022-2023", "2023-2024"])
 
     # Load the pickle file
-    if external_institution == "Portland Community College":
-        institution = "Portland-Community-College"
-    # elif external_institution == "Portland State University":
+    # if institution == "Portland-Community-College":
+    #     institution = "Portland-Community-College"
+    # elif institution == "Portland State University":
     #     institution = "Portland-State-University"
-    # elif external_institution == "Amherst College":
-    #     institution = "Amherst-College"
+    # elif institution == "Amherst College":
+    #     institution = "AC"
 
     # Load courses when both institution and year are selected
     if institution and years:
@@ -211,10 +231,10 @@ if __name__ == "__main__":
     if st.button("Find Similar Courses"):
         if course_code:
             # print(course_code)
-            # print(external_institution)
+            # print(institution)
             if multimodel == True:
-                external_course_info, similar_courses1 = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=True)
-                external_course_info, similar_courses2 = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=False)
+                external_course_info, similar_courses1 = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=True)
+                external_course_info, similar_courses2 = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=False)
 
                 # Merge the two dataframes on 'code'
                 merged_df = pd.merge(similar_courses1, similar_courses2, on='COURSE CODE', suffixes=('_1', '_2'))
@@ -227,7 +247,7 @@ if __name__ == "__main__":
                 similar_courses.columns = ['code', 'title', 'description', 'CODE TITLE DESC', 'similarity']
 
             else:
-                external_course_info, similar_courses = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords)
+                external_course_info, similar_courses = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords)
             
             print("--------------------------------")
             print("EXTERNAL COURSE INFO:")
