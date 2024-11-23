@@ -195,7 +195,8 @@ if __name__ == "__main__":
     unique_years = list(set(list_years_processed))
 
     # Sort by the starting year
-    sorted_years = sorted(unique_years, key=lambda x: int(x.split("-")[0]))
+    sorted_years = sorted(unique_years, key=lambda x: int(x.split("-")[0]), reverse=True)
+
     
     years = st.selectbox("Select Year", sorted_years)
     # years = st.selectbox("Select Year", ["2019-2020", "2020-2021", "2021-2022", "2022-2023", "2023-2024"])
