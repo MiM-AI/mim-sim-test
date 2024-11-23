@@ -74,8 +74,8 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
             # with gzip.open(f"embeddings/OSU/osu_course_embeddings_keywords.pkl.gz", "rb") as f:
             #     target_df1 = pickle.load(f)
 
-            with gzip.open(f"embeddings/Oregon-State-University/2023-2024.pkl.gz", "rb") as f:
-                target_df2 = pickle.load(f)
+            with gzip.open(f"embeddings/Oregon-State-University/2023-2024_keywords.pkl.gz", "rb") as f:
+                target_df = pickle.load(f)
 
         else:
             with gzip.open(f"embeddings/{institution}/{years}.pkl.gz", "rb") as f:
@@ -87,7 +87,7 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
             # with gzip.open(f"embeddings/OSU/osu_course_embeddings.pkl.gz", "rb") as f:
             #     target_df1 = pickle.load(f)
 
-            with gzip.open(f"embeddings/Oregon-State-University/2023-2024_keywords.pkl.gz", "rb") as f:
+            with gzip.open(f"embeddings/Oregon-State-University/2023-2024.pkl.gz", "rb") as f:
                 target_df = pickle.load(f)
 
             # target_df1.columns = ['COURSE CODE', 'COURSE TITLE', 'DESCRIPTION', 'CODE TITLE DESC', 'embedding']
@@ -216,7 +216,7 @@ if __name__ == "__main__":
                 external_course_info, similar_courses2 = find_most_similar_courses(external_institution, years, course_code, apply_matrix=apply_matrix, keywords=False)
 
                 # Merge the two dataframes on 'code'
-                merged_df = pd.merge(similar_courses1, similar_courses2, on='code', suffixes=('_1', '_2'))
+                merged_df = pd.merge(similar_courses1, similar_courses2, on='COURSE CODE', suffixes=('_1', '_2'))
 
                 # Compute weighted average of similarity scores
                 merged_df['weighted_similarity'] = (merged_df['similarity_score_1'] + merged_df['similarity_score_2']) / 2
@@ -241,19 +241,19 @@ if __name__ == "__main__":
                 st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
                 st.write("---")  # Separator for readability
 
-                st.write("### Top OSU Similar Courses:")
+                st.write("### Top OSU Similar Courses (2024-2025 Catalog):")
                 # Loop through each row in the DataFrame and format the output
                 for idx, row in similar_courses.iterrows():
                     similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
                     if similarity_score is not None:
                         similarity_score = f"{similarity_score * 100:.2f}%"
                         # st.write(f"{row['code']} - {row['title']} (Similarity Index: {similarity_score})")
-                        st.write(f"{row['code']} - {row['title']}")
-                        st.write(f"**Description**: {row['description']}")
+                        st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']}")
+                        st.write(f"**Description**: {row['DESCRIPTION']}")
                         st.write("---")  # Separator for readability
                     else:
-                        st.write(f"{row['code']} - {row['title']}")
-                        st.write(f"**Description**: {row['description']}")
+                        st.write(f"{row['COURSE CODE']} - {row['COURSE CODE']}")
+                        st.write(f"**Description**: {row['DESCRIPTION']}")
                         st.write("---")  # Separator for readability
             else:
                 st.write("No similar courses found.")
