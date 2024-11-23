@@ -119,15 +119,26 @@ def get_art_tables(institutions):
 
 
 def proc_acc(udat, apply_matrix=False, keywords=False, multimodel=False):
-	cims = pd.read_excel("data/CIM approved snapshot 2024-07-15.xlsx")
-	
+	# cims = pd.read_excel("data/CIM approved snapshot 2024-07-15.xlsx")
+
+    with gzip.open(f"embeddings/OSU/osu_course_embeddings.pkl.gz", "rb") as f:
+    	target_df = pickle.load(f)
+
+    target_df.columns = ['COURSE CODE', 'COURSE TITLE', 'DESCRIPTION', 'CODE TITLE DESC', 'embedding']
+
+	with gzip.open(f"embeddings/Oregon-State-University/2023-2024.pkl.gz", "rb") as f:
+    	cims = pickle.load(f)
+
+    cims = pd.concat([target_df, cims])
+    cims = cims.drop_duplicates(subset=['COURSE CODE'])
+
 	# Iterate through udat and update with match information
 	matches = []
 
-	row = udat.iloc[9, :]
+	row = udat.iloc[0, :]
 	row
 	for idx, row in udat.iterrows():
-		print(idx)
+		# print(row)
         if multimodel == True:
 	        external_course_info, similar_courses1 = find_most_similar_courses(row['Ext_Inst'], row['Transfer_Year'], row['Ext_Course_Code'], apply_matrix=apply_matrix, keywords=True)
 	        external_course_info, similar_courses2 = find_most_similar_courses(row['Ext_Inst'], row['Transfer_Year'], row['Ext_Course_Code'], apply_matrix=apply_matrix, keywords=False)
@@ -135,14 +146,14 @@ def proc_acc(udat, apply_matrix=False, keywords=False, multimodel=False):
 	        if isinstance(similar_courses1, pd.DataFrame) and isinstance(similar_courses2, pd.DataFrame):
 
 		        # Merge the two dataframes on 'code'
-		        merged_df = pd.merge(similar_courses1, similar_courses2, on='code', suffixes=('_1', '_2'))
+		        merged_df = pd.merge(similar_courses1, similar_courses2, on='COURSE CODE', suffixes=('_1', '_2'))
 
 		        # Compute weighted average of similarity scores
 		        merged_df['weighted_similarity'] = (merged_df['similarity_score_1'] + merged_df['similarity_score_2']) / 2
 
 		        # Sort the dataframe by weighted similarity score in descending order
-		        similar_courses = merged_df[['code', 'title_1', 'description_1', 'CODE TITLE DESC_1', 'weighted_similarity']].sort_values(by='weighted_similarity', ascending=False)
-		        similar_courses.columns = ['code', 'title', 'description', 'CODE TITLE DESC', 'similarity_score']
+		        similar_courses = merged_df[['COURSE CODE', 'COURSE TITLE_1', 'DESCRIPTION_1', 'CODE TITLE DESC_1', 'weighted_similarity']].sort_values(by='weighted_similarity', ascending=False)
+		        similar_courses.columns = ['COURSE CODE', 'COURSE TITLE', 'DESCRIPTION', 'CODE TITLE DESC', 'similarity_score']
 
 		else:
 			# Find most similar courses
@@ -152,23 +163,24 @@ def proc_acc(udat, apply_matrix=False, keywords=False, multimodel=False):
 		if isinstance(similar_courses, pd.DataFrame):
 
 			similar_courses['sim_row'] = range(1, len(similar_courses) + 1)
-			similar_courses['code'] = similar_courses['code'].str.replace(r'(\d+)[^\d]*$', r'\1', regex=True)
+			similar_courses['COURSE CODE'] = similar_courses['COURSE CODE'].str.replace(r'(\d+)[^\d]*$', r'\1', regex=True)
 
 			# Check for match
-			if row['Int_Course_Code'] in similar_courses['code'].values:
+			if row['Int_Course_Code'] in similar_courses['COURSE CODE'].values:
 				# Find the row position and similarity score in similar_courses
-				match_row = similar_courses[similar_courses['code'] == row['Int_Course_Code']].iloc[0]
+				match_row = similar_courses[similar_courses['COURSE CODE'] == row['Int_Course_Code']].iloc[0]
 				
 				matches.append({
 					'Ext_Course_Code': row['Ext_Course_Code'],
-					'OSU_Course_Code': match_row['code'],
+					'OSU_Course_Code': match_row['COURSE CODE'],
 					'row_number': match_row.sim_row,  # Original row number from udat
 					'match': 1,
 					'similar_courses_row_number': match_row.name,  # Row position from similar_courses
 					'similarity_score': match_row['similarity_score']
 				})
+				print("Match found!")
 			else:   # If it doesn't match, check to see if couse is available
-				check = cims[cims['Course Code (code)'] == row['Int_Course_Code']]
+				check = cims[cims['COURSE CODE'] == row['Int_Course_Code']]
 				match = np.where(len(check) > 0, 0, -1)
 				matches.append({
 					'Ext_Course_Code': row['Ext_Course_Code'],
@@ -208,15 +220,45 @@ def proc_acc(udat, apply_matrix=False, keywords=False, multimodel=False):
 udat1 = get_upper_lower_dat(institutions)
 udat2 = get_art_tables(institutions)
 udat = pd.concat([udat1, udat2]).reset_index(drop=True)
-udat['Ext_Inst'] = udat['Ext_Inst'].str.replace(" ", "-")
 
-test = pdat[pdat['TRNS_DESCRIPTION'].str.contains("Lane Comm")]
-test[test['EXT COURSE CODE'].str.contains("BI 231")]
+udat['Transfer_Year'].split("-")
+
+udat["Year"]
+
+# udat['Ext_Inst'] = udat['Ext_Inst'].str.replace(" ", "-")
+# test = udat[udat['Ext_Inst'].str.contains("Lane-Comm")]
+# test[test['Ext_Course_Code'].str.contains("BI")]
+
+# test = pdat[pdat['TRNS_DESCRIPTION'].str.contains("Lane Comm")]
+# test[test['EXT COURSE CODE'].str.contains("BI 231")]
+
 
 outdat = proc_acc(udat, False, False, False)
 
 
-proc_acc(udat, True, False)
+outdat = proc_acc(udat, False, False, True)
+
+
+
+# Matches within top 1: 42.22%
+# Matches within top 2: 61.11%
+# Matches within top 3: 68.89%
+# Matches within top 4: 78.89%
+# Matches within top 5: 82.22%
+# Matches within top 6: 85.56%
+# Matches within top 7: 87.78%
+# Matches within top 8: 88.89%
+# Matches within top 9: 90.0%
+# Matches within top 10: 91.11%
+# Matches within top 11: 94.44%
+# Matches within top 12: 95.56%
+# Matches within top 13: 95.56%
+# Matches within top 14: 95.56%
+# Matches within top 15: 95.56%
+# Matches within top 16: 95.56%
+# Matches within top 17: 96.67%
+
+
 proc_acc(udat, True, True)
 
 apply_matrix=False

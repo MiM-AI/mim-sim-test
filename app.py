@@ -71,8 +71,11 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
             with open("embeddings/custom_embeddings_model/best_matrix_keywords.pkl", "rb") as f:
                 matrix = pickle.load(f)
 
-            with gzip.open(f"embeddings/OSU/osu_course_embeddings_keywords.pkl.gz", "rb") as f:
-                target_df = pickle.load(f)
+            # with gzip.open(f"embeddings/OSU/osu_course_embeddings_keywords.pkl.gz", "rb") as f:
+            #     target_df1 = pickle.load(f)
+
+            with gzip.open(f"embeddings/Oregon-State-University/2023-2024.pkl.gz", "rb") as f:
+                target_df2 = pickle.load(f)
 
         else:
             with gzip.open(f"embeddings/{institution}/{years}.pkl.gz", "rb") as f:
@@ -81,8 +84,15 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
             with open("embeddings/custom_embeddings_model/best_matrix.pkl", "rb") as f:
                 matrix = pickle.load(f)
 
-            with gzip.open(f"embeddings/OSU/osu_course_embeddings.pkl.gz", "rb") as f:
+            # with gzip.open(f"embeddings/OSU/osu_course_embeddings.pkl.gz", "rb") as f:
+            #     target_df1 = pickle.load(f)
+
+            with gzip.open(f"embeddings/Oregon-State-University/2023-2024_keywords.pkl.gz", "rb") as f:
                 target_df = pickle.load(f)
+
+            # target_df1.columns = ['COURSE CODE', 'COURSE TITLE', 'DESCRIPTION', 'CODE TITLE DESC', 'embedding']
+            # target_df = pd.concat([target_df1, target_df2])
+            # target_df = target_df.drop_duplicates(subset=['COURSE CODE'])
 
     except FileNotFoundError:
         print("The embedding file for this institution and year could not be found.")
