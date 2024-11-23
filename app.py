@@ -176,18 +176,17 @@ if __name__ == "__main__":
     st.title("Course Similarity Checker")
 
     # User inputs
-    external_institution = st.selectbox("Select Institution", ["Portland Community College", "Portland State University", "Amherst College"])
+    external_institution = st.selectbox("Select Institution", ["Portland Community College"])
 
     years = st.selectbox("Select Year", ["2019-2020", "2020-2021", "2021-2022", "2022-2023", "2023-2024"])
 
     # Load the pickle file
     if external_institution == "Portland Community College":
-        institution = "PCC"
-    elif external_institution == "Portland State University":
-        institution = "PSU"
-    elif external_institution == "Amherst College":
-        institution = "AC"
-
+        institution = "Portland-Community-College"
+    # elif external_institution == "Portland State University":
+    #     institution = "Portland-State-University"
+    # elif external_institution == "Amherst College":
+    #     institution = "Amherst-College"
 
     # Load courses when both institution and year are selected
     if institution and years:
@@ -205,6 +204,8 @@ if __name__ == "__main__":
     multimodel = False
     keywords = False
     apply_matrix = False
+
+
 
     # Button to perform similarity check
     if st.button("Find Similar Courses"):
