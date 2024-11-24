@@ -177,9 +177,10 @@ if __name__ == "__main__":
     st.title("Course Similarity Checker")
 
     # User inputs
-    institution = st.selectbox("Select Institution", ["Portland-Community-College", 
-        "Central-Oregon-Community-College", 
-        "Linn-Benton-Community-College"])
+    institution = st.selectbox("Select Institution", ["Amherst-College", "Central-Oregon-Community-College",        "Linn-Benton-Community-College", 
+        "Linn-Benton-Community-College",
+        "Portland-Community-College", 
+        "Portland-State-University"])
     
     institution = institution.replace(" ", "-")
     list_years = glob.glob(f"embeddings/{institution}/*")
