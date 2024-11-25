@@ -231,7 +231,7 @@ if __name__ == "__main__":
 
 
     # Button to perform similarity check
-    if st.button("Find Similar Courses"):
+    if st.button("Run AI"):
         if course_code:
             # print(course_code)
             # print(institution)
