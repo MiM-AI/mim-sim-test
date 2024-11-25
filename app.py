@@ -174,10 +174,9 @@ def load_courses(institution, years, keywords=False):
 
 if __name__ == "__main__":
 
-    st.title("Course Similarity Checker")
-
+    st.title("AI Course Matching")
     # User inputs
-    institution = st.selectbox("Select Institution", [
+    institution = st.selectbox("Select External Institution", [
         "Amherst-College", 
         "Central-Oregon-Community-College",
         "Linn-Benton-Community-College",
@@ -201,7 +200,7 @@ if __name__ == "__main__":
     sorted_years = sorted(unique_years, key=lambda x: int(x.split("-")[0]), reverse=True)
 
     
-    years = st.selectbox("Select Year", sorted_years)
+    years = st.selectbox("Select Course Catalog Year", sorted_years)
     # years = st.selectbox("Select Year", ["2019-2020", "2020-2021", "2021-2022", "2022-2023", "2023-2024"])
 
     # Load the pickle file
@@ -216,7 +215,7 @@ if __name__ == "__main__":
     if institution and years:
         available_courses = load_courses(institution, years, keywords=True)
         if available_courses:
-            course_code = st.selectbox("Select Course Code", list(available_courses.keys()), format_func=lambda x: f"{x} - {available_courses[x]}")
+            course_code = st.selectbox("Select Course to Articulate", list(available_courses.keys()), format_func=lambda x: f"{x} - {available_courses[x]}")
         else:
             st.warning("No courses available for the selected institution and year.")
     else:
@@ -266,7 +265,7 @@ if __name__ == "__main__":
                 st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
                 st.write("---")  # Separator for readability
 
-                st.write("### Top OSU Similar Courses (2024-2025 Catalog):")
+                st.write("### Closest OSU Courses (2024-2025 Catalog):")
                 # Loop through each row in the DataFrame and format the output
                 for idx, row in similar_courses.iterrows():
                     similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
