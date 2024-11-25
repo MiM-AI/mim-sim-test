@@ -215,7 +215,7 @@ if __name__ == "__main__":
     if institution and years:
         available_courses = load_courses(institution, years, keywords=True)
         if available_courses:
-            course_code = st.selectbox("Select Course to Articulate", list(available_courses.keys()), format_func=lambda x: f"{x} - {available_courses[x]}")
+            course_code = st.selectbox("Select External Course to Articulate", list(available_courses.keys()), format_func=lambda x: f"{x} - {available_courses[x]}")
         else:
             st.warning("No courses available for the selected institution and year.")
     else:
