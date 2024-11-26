@@ -9,11 +9,9 @@ import torch  # for matrix optimization
 from typing import List, Tuple  # for type hints
 import glob
 
-# external_institution = "Portland Community College"
-# years = "2019-2020"
-# course_code = "Soc 204"
-# target_df = internal_emb
-# matrix = best_matrix_loaded
+institution = "Central-Oregon-Community-College"
+years = "2023-2024"
+course_code = "MTH 112Z"
 
 # test = find_most_similar_courses(institution, years, course_code, best_matrix_loaded, target_df, top_n=10)
 
@@ -38,7 +36,7 @@ def embedding_multiplied_by_matrix(
     return modified_embedding
 
 
-def find_most_similar_courses(institution, years, course_code, top_n=10, apply_matrix=True, keywords=True):
+def find_most_similar_courses(institution, years, course_code, top_n=10, apply_matrix=False, keywords=False):
     """
     Finds the top N most similar courses based on cosine similarity, using custom embeddings if available.
     
@@ -100,8 +98,9 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
         return None, None
 
     # Process course code
-    if re.search(r'\d+[A-Z]$', course_code):
-        course_code = course_code[:-1]
+    # if re.search(r'\d+[A-Z]$', course_code):
+    #     course_code = course_code[:-1]
+
     course_code = course_code.upper()
 
     # Filter and clean selected embedding
@@ -139,6 +138,14 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
     top_indices = np.argsort(similarities)[-top_n:][::-1]
     similar_courses = target_df.iloc[top_indices].copy()
     similar_courses['similarity_score'] = similarities[top_indices]
+
+    # Extracting numeric part for sorting
+    similar_courses['COURSE NUMBER'] = similar_courses['COURSE CODE'].str.extract(r'(\d+)').astype(int)
+
+    # Sorting by extracted course number
+    similar_courses = similar_courses.sort_values(by=['COURSE NUMBER', 'COURSE CODE'])
+
+    similar_courses = similar_courses.reset_index(drop=True)
 
     return external_course_info, similar_courses
 
@@ -260,18 +267,18 @@ if __name__ == "__main__":
             print("SIMILAR COURSES")
             print(similar_courses)
             if similar_courses is not None:
-                st.write("### External Course Info:")
+                st.write("### External Course Info")
                 st.write(f"{external_course_info['COURSE CODE'].iat[0]} - {external_course_info['COURSE TITLE'].iat[0]}")
                 st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
                 st.write("---")  # Separator for readability
 
-                st.write("### Closest OSU Courses (2024-2025 Catalog):")
+                st.write("### Closest OSU Courses (2024-2025 Catalog - Ordered by Course Number)")
                 # Loop through each row in the DataFrame and format the output
                 for idx, row in similar_courses.iterrows():
                     similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
                     if similarity_score is not None:
                         similarity_score = f"{similarity_score * 100:.2f}%"
-                        # st.write(f"{row['code']} - {row['title']} (Similarity Index: {similarity_score})")
+                        # st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']} (Similarity Index: {similarity_score})")
                         st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']}")
                         st.write(f"**Description**: {row['DESCRIPTION']}")
                         st.write("---")  # Separator for readability
