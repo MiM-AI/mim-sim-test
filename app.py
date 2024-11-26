@@ -272,7 +272,12 @@ if __name__ == "__main__":
                 st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
                 st.write("---")  # Separator for readability
 
-                st.write("### Closest OSU Courses (2024-2025 Catalog - Ordered by Course Number)")
+                st.write("### Closest OSU Courses (2024-2025 Catalog)")
+                st.write("Here are the top 10 closest matches at OSU, ordered by course number. Review these courses for a direct articulation. If none fit, a direct articulation is likely unavailable.")
+                st.write(" ")  # Separator for readability
+                st.write(" ")  # Separator for readability
+                st.write(" ")  # Separator for readability
+                st.write(" ")  # Separator for readability
                 # Loop through each row in the DataFrame and format the output
                 for idx, row in similar_courses.iterrows():
                     similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
