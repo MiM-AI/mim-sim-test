@@ -143,7 +143,11 @@ def find_most_similar_courses(institution, years, course_code, top_n=10, apply_m
     similar_courses['COURSE NUMBER'] = similar_courses['COURSE CODE'].str.extract(r'(\d+)').astype(int)
 
     # Sorting by extracted course number
-    similar_courses = similar_courses.sort_values(by=['COURSE NUMBER', 'COURSE CODE'])
+    # similar_courses = similar_courses.sort_values(by=['COURSE NUMBER', 'COURSE CODE'])
+
+    # Sorting by similarity score
+    similar_courses = similar_courses.sort_values(by=['similarity_score'], ascending=False)
+
 
     similar_courses = similar_courses.reset_index(drop=True)
 
@@ -275,22 +279,20 @@ if __name__ == "__main__":
                 st.write("### Closest OSU Courses (2024-2025 Catalog)")
                 st.write("Here are the top 10 closest matches at OSU, ordered by course number. Review these courses for a direct articulation. If none fit, a direct articulation is likely unavailable.")
                 st.write(" ")  # Separator for readability
-                st.write(" ")  # Separator for readability
-                st.write(" ")  # Separator for readability
-                st.write(" ")  # Separator for readability
+
                 # Loop through each row in the DataFrame and format the output
                 for idx, row in similar_courses.iterrows():
                     similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
                     if similarity_score is not None:
-                        similarity_score = f"{similarity_score * 100:.2f}%"
-                        # st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']} (Similarity Index: {similarity_score})")
-                        st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']}")
+                        if similarity_score > 0.72:
+                            confidence_message = "High Confidence"
+                        else:
+                            confidence_message = "Low Confidence"
+
+                        st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']} ({confidence_message})")
                         st.write(f"**Description**: {row['DESCRIPTION']}")
                         st.write("---")  # Separator for readability
-                    else:
-                        st.write(f"{row['COURSE CODE']} - {row['COURSE CODE']}")
-                        st.write(f"**Description**: {row['DESCRIPTION']}")
-                        st.write("---")  # Separator for readability
+
             else:
                 st.write("No similar courses found.")
 
