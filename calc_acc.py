@@ -235,6 +235,9 @@ udat["Year"]
 
 outdat = proc_acc(udat, False, False, False)
 
+outdat2 = outdat.dropna(subset=['similarity_score'])
+
+outdat2['similarity_score']
 
 outdat = proc_acc(udat, False, False, True)
 
