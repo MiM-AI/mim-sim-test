@@ -9,11 +9,9 @@ import torch  # for matrix optimization
 from typing import List, Tuple  # for type hints
 import glob
 
-# institution = "Central-Oregon-Community-College"
-# years = "2023-2024"
-# course_code = "MTH 112Z"
-
-st.set_page_config(layout="wide")
+institution = "Central-Oregon-Community-College"
+years = "2023-2024"
+course_code = "MTH 112Z"
 
 # test = find_most_similar_courses(institution, years, course_code, best_matrix_loaded, target_df, top_n=10)
 
@@ -243,15 +241,14 @@ if __name__ == "__main__":
 
 
 
+    # Button to perform similarity check
     if st.button("Run AI"):
         if course_code:
-            if multimodel:
-                external_course_info, similar_courses1 = find_most_similar_courses(
-                    institution, years, course_code, apply_matrix=apply_matrix, keywords=True
-                )
-                external_course_info, similar_courses2 = find_most_similar_courses(
-                    institution, years, course_code, apply_matrix=apply_matrix, keywords=False
-                )
+            # print(course_code)
+            # print(institution)
+            if multimodel == True:
+                external_course_info, similar_courses1 = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=True)
+                external_course_info, similar_courses2 = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=False)
 
                 # Merge the two dataframes on 'code'
                 merged_df = pd.merge(similar_courses1, similar_courses2, on='COURSE CODE', suffixes=('_1', '_2'))
@@ -260,47 +257,45 @@ if __name__ == "__main__":
                 merged_df['weighted_similarity'] = (merged_df['similarity_score_1'] + merged_df['similarity_score_2']) / 2
 
                 # Sort the dataframe by weighted similarity score in descending order
-                similar_courses = merged_df[
-                    ['code', 'title_1', 'description_1', 'CODE TITLE DESC_1', 'weighted_similarity']
-                ].sort_values(by='weighted_similarity', ascending=False)
+                similar_courses = merged_df[['code', 'title_1', 'description_1', 'CODE TITLE DESC_1', 'weighted_similarity']].sort_values(by='weighted_similarity', ascending=False)
                 similar_courses.columns = ['code', 'title', 'description', 'CODE TITLE DESC', 'similarity']
 
             else:
-                external_course_info, similar_courses = find_most_similar_courses(
-                    institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords
-                )
-
+                external_course_info, similar_courses = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords)
+            
+            print("--------------------------------")
+            print("EXTERNAL COURSE INFO:")
+            # print(external_course_info)
+            print(external_course_info['COURSE CODE'].iat[0], external_course_info['COURSE TITLE'].iat[0])
+            print("--------------------------------")
+            print("SIMILAR COURSES")
+            print(similar_courses)
             if similar_courses is not None:
-                # Create two columns with explicit proportions for spacing
-                col1, col2 = st.columns([0.1, 0.10], gap="medium")  # Adjust proportions for spacing
+                st.write("### External Course Info")
+                st.write(f"{external_course_info['COURSE CODE'].iat[0]} - {external_course_info['COURSE TITLE'].iat[0]}")
+                st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
+                st.write("---")  # Separator for readability
 
-                with col1:
-                    with st.container():
-                        st.markdown("<div style='padding: 10px;'>", unsafe_allow_html=True)
-                        st.write("### External Course Info")
-                        st.write(f"{external_course_info['COURSE CODE'].iat[0]} - {external_course_info['COURSE TITLE'].iat[0]}")
-                        st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
-                        st.markdown("<hr>", unsafe_allow_html=True)  # Horizontal line for separation
-                        st.markdown("</div>", unsafe_allow_html=True)
+                st.write("### Closest OSU Courses (2024-2025 Catalog)")
+                st.write("Here are the top 10 closest matches at OSU, ordered by course number. Review these courses for a direct articulation. If none fit, a direct articulation is likely unavailable.")
+                st.write(" ")  # Separator for readability
 
-                with col2:
-                    with st.container():
-                        st.markdown("<div style='padding: 10px;'>", unsafe_allow_html=True)
-                        st.write("### Closest OSU Courses (2024-2025 Catalog)")
-                        st.write(
-                            "Here are the top 10 closest matches at OSU, ordered by course number. "
-                            "Review these courses for a direct articulation. If none fit, a direct articulation is likely unavailable."
-                        )
+                # Loop through each row in the DataFrame and format the output
+                for idx, row in similar_courses.iterrows():
+                    similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
+                    if similarity_score is not None:
+                        if similarity_score > 0.72:
+                            confidence_message = "High Confidence"
+                        else:
+                            confidence_message = "Low Confidence"
 
-                        # Loop through similar courses
-                        for idx, row in similar_courses.iterrows():
-                            similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
-                            if similarity_score is not None:
-                                confidence_message = "High Confidence" if similarity_score > 0.72 else "Low Confidence"
-                                st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']} ({confidence_message})")
-                                st.write(f"**Description**: {row['DESCRIPTION']}")
-                                st.markdown("<hr>", unsafe_allow_html=True)  # Horizontal line for separation
-                        st.markdown("</div>", unsafe_allow_html=True)
+                        st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']} ({confidence_message})")
+                        st.write(f"**Description**: {row['DESCRIPTION']}")
+                        st.write("---")  # Separator for readability
 
             else:
                 st.write("No similar courses found.")
+
+
+
+
