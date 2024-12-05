@@ -270,31 +270,41 @@ if __name__ == "__main__":
             print("--------------------------------")
             print("SIMILAR COURSES")
             print(similar_courses)
-            if similar_courses is not None:
-                st.write("### External Course Info")
-                st.write(f"{external_course_info['COURSE CODE'].iat[0]} - {external_course_info['COURSE TITLE'].iat[0]}")
-                st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
-                st.write("---")  # Separator for readability
+            if st.button("Find Similar Courses"):
+                if course_code:
+                    # print(course_code)
+                    # print(external_institution)
 
-                st.write("### Closest OSU Courses (2024-2025 Catalog)")
-                st.write("Here are the top 10 closest matches at OSU, ordered by course number. Review these courses for a direct articulation. If none fit, a direct articulation is likely unavailable.")
-                st.write(" ")  # Separator for readability
-
-                # Loop through each row in the DataFrame and format the output
-                for idx, row in similar_courses.iterrows():
-                    similarity_score = row.get('similarity_score', row.get('similarity_score_custom', None))
-                    if similarity_score is not None:
-                        if similarity_score > 0.72:
-                            confidence_message = "High Confidence"
-                        else:
-                            confidence_message = "Low Confidence"
-
-                        st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']} ({confidence_message})")
-                        st.write(f"**Description**: {row['DESCRIPTION']}")
+                    external_course_info, similar_courses = find_most_similar_courses(external_institution, years, course_code, internal_emb)
+                    print("EXTERNAL COURSE INFO")
+                    print(external_course_info)
+                    print("SIMILAR COURSES")
+                    print(similar_courses)
+                    if similar_courses is not None:
+                        st.write("### External Course Info:")
+                        st.write(f"{external_course_info['COURSE CODE'].iat[0]} - {external_course_info['COURSE TITLE'].iat[0]}")
+                        st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
                         st.write("---")  # Separator for readability
+                        st.write("\n")  # Separator for readability
 
-            else:
-                st.write("No similar courses found.")
+                        st.write("### Top OSU Similar Courses:")
+                        # Loop through each row in the DataFrame and format the output
+                        for idx, row in similar_courses.iterrows():
+                            similarity_score = row['similarity_score'] * 100
+                            if similarity_score > 65:
+                                confidence_label = "High Confidence"
+                            elif 35 < similarity_score <= 65:
+                                confidence_label = "Low Confidence"
+                            else:
+                                confidence_label = "No Confidence"
+                            
+                            similarity_score_formatted = f"{similarity_score:.2f}%"
+                            st.write(f"{row['code']} - {row['title']} (Similarity Index: {similarity_score_formatted}, {confidence_label})")
+                            st.write(f"**Description**: {row['description']}")
+                            st.write("---")  # Separator for readability
+
+                    else:
+                        st.write("No similar courses found.")
 
 
 
