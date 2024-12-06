@@ -239,73 +239,72 @@ if __name__ == "__main__":
     keywords = False
     apply_matrix = False
 
-
-
-    # Button to perform similarity check
     if st.button("Run AI"):
         if course_code:
-            # print(course_code)
-            # print(institution)
-            if multimodel == True:
-                external_course_info, similar_courses1 = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=True)
-                external_course_info, similar_courses2 = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=False)
+            # Handle multi-model processing
+            if multimodel:
+                # Find most similar courses with keywords and without
+                external_course_info, similar_courses1 = find_most_similar_courses(
+                    institution, years, course_code, apply_matrix=apply_matrix, keywords=True
+                )
+                external_course_info, similar_courses2 = find_most_similar_courses(
+                    institution, years, course_code, apply_matrix=apply_matrix, keywords=False
+                )
 
-                # Merge the two dataframes on 'code'
+                # Merge the two dataframes on 'COURSE CODE'
                 merged_df = pd.merge(similar_courses1, similar_courses2, on='COURSE CODE', suffixes=('_1', '_2'))
 
                 # Compute weighted average of similarity scores
-                merged_df['weighted_similarity'] = (merged_df['similarity_score_1'] + merged_df['similarity_score_2']) / 2
+                merged_df['weighted_similarity'] = (
+                    merged_df['similarity_score_1'] + merged_df['similarity_score_2']
+                ) / 2
 
-                # Sort the dataframe by weighted similarity score in descending order
-                similar_courses = merged_df[['code', 'title_1', 'description_1', 'CODE TITLE DESC_1', 'weighted_similarity']].sort_values(by='weighted_similarity', ascending=False)
+                # Sort by weighted similarity and rename columns for clarity
+                similar_courses = merged_df[
+                    ['code', 'title_1', 'description_1', 'CODE TITLE DESC_1', 'weighted_similarity']
+                ].sort_values(by='weighted_similarity', ascending=False)
                 similar_courses.columns = ['code', 'title', 'description', 'CODE TITLE DESC', 'similarity']
 
             else:
-                external_course_info, similar_courses = find_most_similar_courses(institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords)
-            
-            print("--------------------------------")
-            print("EXTERNAL COURSE INFO:")
-            # print(external_course_info)
-            print(external_course_info['COURSE CODE'].iat[0], external_course_info['COURSE TITLE'].iat[0])
-            print("--------------------------------")
-            print("SIMILAR COURSES")
-            print(similar_courses)
-            if st.button("Find Similar Courses"):
-                if course_code:
-                    # print(course_code)
-                    # print(external_institution)
+                # Single-model processing
+                external_course_info, similar_courses = find_most_similar_courses(
+                    institution, years, course_code, apply_matrix=apply_matrix, keywords=keywords
+                )
 
-                    external_course_info, similar_courses = find_most_similar_courses(external_institution, years, course_code, internal_emb)
-                    print("EXTERNAL COURSE INFO")
-                    print(external_course_info)
-                    print("SIMILAR COURSES")
-                    print(similar_courses)
-                    if similar_courses is not None:
-                        st.write("### External Course Info:")
-                        st.write(f"{external_course_info['COURSE CODE'].iat[0]} - {external_course_info['COURSE TITLE'].iat[0]}")
-                        st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
-                        st.write("---")  # Separator for readability
-                        st.write("\n")  # Separator for readability
+            # Display external course information
+            st.write("### External Course Info")
+            st.write(f"{external_course_info['COURSE CODE'].iat[0]} - {external_course_info['COURSE TITLE'].iat[0]}")
+            st.write(f"{external_course_info['DESCRIPTION'].iat[0]}")
+            st.write("---")  # Separator for readability
 
-                        st.write("### Top OSU Similar Courses:")
-                        # Loop through each row in the DataFrame and format the output
-                        for idx, row in similar_courses.iterrows():
-                            similarity_score = row['similarity_score'] * 100
-                            if similarity_score > 65:
-                                confidence_label = "High Confidence"
-                            elif 35 < similarity_score <= 65:
-                                confidence_label = "Low Confidence"
-                            else:
-                                confidence_label = "No Confidence"
-                            
-                            similarity_score_formatted = f"{similarity_score:.2f}%"
-                            st.write(f"{row['code']} - {row['title']} (Similarity Index: {similarity_score_formatted}, {confidence_label})")
-                            st.write(f"**Description**: {row['description']}")
-                            st.write("---")  # Separator for readability
+            # Display similar courses
+            if similar_courses is not None:
+                st.write("### Closest OSU Courses (2024-2025 Catalog)")
+                st.write(
+                    "Here are the top 10 closest matches at OSU, ordered by course number. "
+                    "Review these courses for a direct articulation. If none fit, a direct articulation is likely unavailable."
+                )
+                st.write(" ")
 
+                # Loop through each row in the DataFrame and display formatted output
+                for _, row in similar_courses.iterrows():
+                    similarity_score = row.get('similarity_score', row.get('similarity'))
+                    
+                    # Determine confidence label
+                    if similarity_score > 0.65:
+                        confidence_label = "High Confidence"
+                    elif 0.35 < similarity_score <= 0.65:
+                        confidence_label = "Low Confidence"
                     else:
-                        st.write("No similar courses found.")
+                        confidence_label = "No Confidence"
 
+                    # Commented similarity score for future use
+                    # similarity_score_formatted = f"{similarity_score * 100:.2f}%" if similarity_score else "N/A"
 
-
-
+                    st.write(f"{row['COURSE CODE']} - {row['COURSE TITLE']} ({confidence_label})")
+                    st.write(f"**Description**: {row['DESCRIPTION']}")
+                    st.write("---")  # Separator for readability
+            else:
+                st.write("No similar courses found.")
+        else:
+            st.warning("Please select a course to proceed.")
