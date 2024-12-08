@@ -189,10 +189,16 @@ if __name__ == "__main__":
     # User inputs
     institution = st.selectbox("Select External Institution", [
         "Amherst-College", 
+        "Austin-Community-College-District",
+        "Capella-University",
         "Central-Oregon-Community-College",
+        "George-Fox-University",
         "Linn-Benton-Community-College",
+        "New-York-University",
         "Portland-Community-College", 
-        "Portland-State-University"])
+        "Portland-State-University",
+        "Santa-Barbara-City-College"
+        ])
     
     institution = institution.replace(" ", "-")
     list_years = glob.glob(f"embeddings/{institution}/*")
