@@ -286,7 +286,7 @@ if __name__ == "__main__":
             if similar_courses is not None:
                 st.write("### Closest OSU Courses (2024-2025 Catalog)")
                 st.write(
-                    "Here are the top 10 closest matches at OSU, ordered by course number. "
+                    "Here are the top 10 closest matches at OSU, ordered by how confident we are in a match. High and low confidence matches are provided."
                     "Review these courses for a direct articulation. If none fit, a direct articulation is likely unavailable."
                 )
                 st.write(" ")
