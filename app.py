@@ -9,9 +9,9 @@ import torch  # for matrix optimization
 from typing import List, Tuple  # for type hints
 import glob
 
-institution = "Central-Oregon-Community-College"
-years = "2023-2024"
-course_code = "MTH 112Z"
+# institution = "Central-Oregon-Community-College"
+# years = "2023-2024"
+# course_code = "MTH 112Z"
 
 # test = find_most_similar_courses(institution, years, course_code, best_matrix_loaded, target_df, top_n=10)
 
@@ -216,7 +216,6 @@ if __name__ == "__main__":
     # Sort by the starting year
     sorted_years = sorted(unique_years, key=lambda x: int(x.split("-")[0]), reverse=True)
 
-    
     years = st.selectbox("Select Course Catalog Year", sorted_years)
     # years = st.selectbox("Select Year", ["2019-2020", "2020-2021", "2021-2022", "2022-2023", "2023-2024"])
 
