@@ -192,14 +192,18 @@ if __name__ == "__main__":
         "Austin-Community-College-District",
         "Capella-University",
         "Central-Oregon-Community-College",
+        "Daytona-State-College",
         "George-Fox-University",
         "Linn-Benton-Community-College",
         "New-York-University",
         "Portland-Community-College", 
         "Portland-State-University",
-        "Santa-Barbara-City-College"
+        "Santa-Barbara-City-College",
+        "Sonoma-State-University",
+        "University-of-Redlands",
+        "Winona-State-University"
         ])
-    
+
     institution = institution.replace(" ", "-")
     list_years = glob.glob(f"embeddings/{institution}/*")
     
