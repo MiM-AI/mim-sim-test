@@ -1,6 +1,50 @@
-*.csv
-.*
+# OS files
+.DS_Store
+Thumbs.db
 
-# Do not ignore .gitignore and .env.example
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# Data files
+*.csv
+*.xlsx
+*.xls
+*.json
+data/
+
+# Embeddings and model artifacts
+embeddings/
+*.pkl
+*.pkl.gz
+
+# Images and plots
+*.png
+*.jpg
+*.jpeg
+*.svg
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Keep these files
 !.gitignore
 !.env.example
+!requirements.txt

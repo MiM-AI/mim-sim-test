@@ -236,8 +236,36 @@ udat["Year"]
 outdat = proc_acc(udat, False, False, False)
 
 outdat2 = outdat.dropna(subset=['similarity_score'])
-
 outdat2['similarity_score']
+
+import numpy as np
+from scipy.stats import gaussian_kde
+
+# Data for plotting
+scores = outdat2['similarity_score'].dropna()  # Drop NaNs to avoid issues
+
+# Create the histogram
+plt.hist(scores, bins=30, density=True, edgecolor='k', alpha=0.7, label='Histogram')
+
+# Add a KDE line
+kde = gaussian_kde(scores)
+x_vals = np.linspace(scores.min(), scores.max(), 100)
+plt.plot(x_vals, kde(x_vals), label='Density Curve', color='red')
+
+# Add labels and legend
+plt.title('Distribution of Similarity Scores')
+plt.xlabel('Similarity Score')
+plt.ylabel('Density')
+plt.legend()
+plt.show()
+
+# Calculate the 25th percentile
+percentile_25 = outdat2['similarity_score'].quantile(0.25)
+
+print(f"The 25th percentile of similarity scores is: {percentile_25}")
+
+
+
 
 outdat = proc_acc(udat, False, False, True)
 
